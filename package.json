@@ -1,5 +1,5 @@
 {
-  "name": "my-turborepo",
+  "name": "implyinfer-jetson-orin-nano-field-kit",
   "private": true,
   "scripts": {
     "build": "turbo run build",
