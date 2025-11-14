@@ -68,13 +68,6 @@ DANGEROUS_PATTERNS = [
     r';\s*rm',  # Command chaining with rm
     r'&&\s*rm',  # Logical AND with rm
 ]
-
-print("Loading Whisper model...")
-
-model = WhisperModel("distil-small.en", device="cuda", compute_type="float16")
-
-print(model)
-
 class FasterWhisperSTT(stt.STT):
     """Custom STT implementation using faster_whisper"""
     

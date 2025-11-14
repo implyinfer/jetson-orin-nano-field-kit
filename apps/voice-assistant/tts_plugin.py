@@ -175,10 +175,7 @@ def get_tts_plugin(use_local: bool = False):
     
     # Try to use cloud TTS if available
     try:
-        if os.getenv("CARTESIA_API_KEY"):
-            logger.info("Using Cartesia cloud TTS")
-            # Use string identifier format: "cartesia/sonic-2:voice-id"
-            return "cartesia/sonic-2:6f84f4b8-58a2-430c-8c79-688dad597532"
+        return "cartesia/sonic-2:6f84f4b8-58a2-430c-8c79-688dad597532"
     except Exception as e:
         logger.warning(f"Failed to initialize Cartesia TTS: {e}")
     

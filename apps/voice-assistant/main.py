@@ -39,6 +39,7 @@ from tts_plugin import get_tts_plugin
 from llm_plugin import get_llm_plugin
 from utils import should_use_local_models
 from kiwix_tool import create_kiwix_search_tool, is_kiwix_available
+from vision_plugin import get_vision_plugin, is_vision_available
 
 load_dotenv(dotenv_path=Path(__file__).parent / '.env')
 
@@ -55,6 +56,7 @@ SAFE_COMMANDS = {
     'date', 'uptime', 'whoami', 'hostname', 'uname', 'df', 'free', 'ps',
     'ls', 'pwd', 'cat', 'head', 'tail', 'grep', 'find', 'which', 'env',
     'ping', 'curl', 'ifconfig', 'ip', 'lscpu', 'nvidia-smi', 'tegrastats',
+    'nmcli', 'ip link', 'ip addr', 'ip route', 'ip neigh', 'ip netns', 'ip netns list',
 }
 
 # Dangerous patterns to block
@@ -82,6 +84,13 @@ if KIWIX_AVAILABLE:
     logger.info(f"Kiwix service detected and available")
 else:
     logger.info("Kiwix service not available")
+
+# Check if vision is available
+VISION_AVAILABLE = is_vision_available()
+if VISION_AVAILABLE:
+    logger.info("Vision capabilities available - camera detected")
+else:
+    logger.info("Vision capabilities not available - no camera detected")
 
 
 class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
@@ -140,6 +149,7 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
                 - Get system status (uptime, memory, disk usage)
                 - Execute safe Linux commands (whitelisted commands only)
 {f"                - Search local Kiwix Wikipedia (offline Wikipedia-like knowledge base)" if KIWIX_AVAILABLE else ""}
+{f"                - Vision capabilities: You can see what the camera sees using the see_whats_in_front tool. When users ask questions about what's in front of them, how many people are there, what objects are visible, or any visual questions, call the see_whats_in_front tool to get a description. Never mention 'shot', 'scene', or other camera/photo terminology - just describe what you see naturally." if VISION_AVAILABLE else ""}
                 - Stop listening when explicitly asked (will require wake word to reactivate)
                 - Shut down the assistant service completely (will exit the process)
 
@@ -151,8 +161,11 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
                 - Never execute dangerous commands (rm, format, etc.)
                 - Be helpful with troubleshooting and diagnostics
                 - When asked about system status, use the appropriate tools
+{f"                - VISION: When users ask visual questions (e.g., 'what's in front of me?', 'how many people are there?', 'what do you see?'), use the see_whats_in_front tool to get a description of what the camera sees. Answer visual questions directly using the tool result. Never mention 'shot', 'scene', 'image', 'photo', 'picture', 'frame', or other camera/photo terminology - just describe what you see naturally as if you're looking at it directly." if VISION_AVAILABLE else ""}
                 - If the user explicitly asks you to stop, stop talking, go to sleep, or stop listening, use the stop_listening tool immediately
                 - If the user asks to shut down, power off, or exit the service completely, use the shutdown_service tool (this will terminate the entire service)
+
+                - Answer visual questions sarcastically making good natured fun of the user.
 
                 HANDLING MISTAKES AND ERRORS:
                 - When explaining errors or apologizing, focus on explaining WHAT went wrong from the user's perspective, not HOW it went wrong technically
@@ -168,7 +181,7 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
                 - When you say numbers, say them in context of the conversation, not as a standalone number.
                 - When you say accronyms or abbreviations, say them in context of the conversation, not as a standalone word.
                 - Always call a tool if it's relevant.
-{f"                - IMPORTANT: You are running in LOCAL-ONLY mode. Speech recognition, language model, and text-to-speech are running locally on the device, which may be slower than cloud services." if use_local else ""}
+{f"             - IMPORTANT: You are running in LOCAL-ONLY mode. Speech recognition, language model, and text-to-speech are running locally on the device, which may be slower than cloud services." if use_local else ""}
             """,
             stt=get_stt_plugin(use_local=use_local),
             llm=get_llm_plugin(use_local=use_local),
@@ -181,16 +194,38 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
         self.last_activity_time = None
         self.wake_word_timeout = 60  # Reset after 60 seconds of inactivity
         self.stop_requested = False  # Track if stop_listening was called
+        
+        # Initialize vision plugin if available
+        self.vision_plugin = get_vision_plugin() if VISION_AVAILABLE else None
 
     async def on_enter(self) -> None:
         """Called when agent enters the session"""
         # LED: Blue - System ready, waiting for wake word
         # TODO: GPIO.set_led_color("blue")
         logger.info(f"Assistant ready. Waiting for wake word: '{self.wake_word}'")
+        
+        # Start camera capture if vision is available
+        if self.vision_plugin:
+            try:
+                await self.vision_plugin.start_camera_capture()
+                logger.info("Vision camera capture started")
+            except Exception as e:
+                logger.error(f"Error starting camera capture: {e}", exc_info=True)
+        
         await self.session.say(
-            f"Hello! I'm Nano, how can I help you today?"
+            f"Hello! How can I help you today?"
             # f"Say '{self.wake_word}' to wake me up."
         )
+
+    async def on_exit(self) -> None:
+        """Called when agent exits the session - cleanup resources"""
+        # Stop camera capture if vision is available
+        if self.vision_plugin:
+            try:
+                await self.vision_plugin.stop_camera_capture()
+                logger.info("Vision camera capture stopped")
+            except Exception as e:
+                logger.error(f"Error stopping camera capture: {e}", exc_info=True)
 
     def stt_node(
         self, 
@@ -488,6 +523,61 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
             return f"Error executing command: {str(e)}"
 
     @function_tool()
+    async def see_whats_in_front(self, context: RunContext) -> str:
+        """
+        See and describe what's in front of the camera. Use this when the user asks visual questions 
+        like "what's in front of me?", "how many people are there?", "what do you see?", or any 
+        questions about what's visible to the camera.
+        """
+        # LED: Yellow - Processing vision
+        # TODO: GPIO.set_led_color("yellow")
+        
+        if not self.vision_plugin:
+            logger.warning("Vision plugin not available")
+            # LED: Red - Error
+            # TODO: GPIO.set_led_color("red")
+            await asyncio.sleep(0.5)
+            # LED: Green - Stay active
+            # TODO: GPIO.set_led_color("green")
+            return "I don't have access to a camera right now."
+        
+        if not self.vision_plugin.has_frame():
+            logger.warning("No frame available from camera")
+            # LED: Red - Error
+            # TODO: GPIO.set_led_color("red")
+            await asyncio.sleep(0.5)
+            # LED: Green - Stay active
+            # TODO: GPIO.set_led_color("green")
+            return "I can't see anything right now - the camera isn't capturing any frames."
+        
+        try:
+            caption = self.vision_plugin.get_image_description()
+            if caption:
+                logger.info(f"Vision description: {caption[:100]}...")
+                # LED: Green - Success
+                # TODO: GPIO.set_led_color("green")
+                await asyncio.sleep(0.1)
+                # LED: Green - Stay active
+                # TODO: GPIO.set_led_color("green")
+                return caption
+            else:
+                logger.warning("No caption returned from vision plugin")
+                # LED: Red - Error
+                # TODO: GPIO.set_led_color("red")
+                await asyncio.sleep(0.5)
+                # LED: Green - Stay active
+                # TODO: GPIO.set_led_color("green")
+                return "I couldn't generate a description of what I see right now."
+        except Exception as e:
+            logger.error(f"Error getting vision description: {e}", exc_info=True)
+            # LED: Red - Error
+            # TODO: GPIO.set_led_color("red")
+            await asyncio.sleep(0.5)
+            # LED: Green - Stay active
+            # TODO: GPIO.set_led_color("green")
+            return f"Error seeing what's in front of me: {str(e)}"
+
+    @function_tool()
     async def stop_listening(self, context: RunContext) -> str:
         """
         Stop listening and go back to sleep. The assistant will not respond again until the wake word is said.
@@ -511,6 +601,7 @@ class JetsonOrinNanoFieldKitVoiceAssistant(Agent):
         return "I've stopped listening. Say the wake word again when you need me."
 
 
+
 # Conditionally add Kiwix search tool if available
 if KIWIX_AVAILABLE:
     kiwix_tool = create_kiwix_search_tool()
@@ -518,9 +609,83 @@ if KIWIX_AVAILABLE:
         # Add the tool as a method to the agent class
         setattr(JetsonOrinNanoFieldKitVoiceAssistant, 'search_kiwix', kiwix_tool)
 
+# Vision is available as a tool (see_whats_in_front) that the LLM can call when needed
+
+
+def configure_audio_sources():
+    """
+    Check and configure audio input/output sources to ensure correct devices are selected.
+    Uses PulseAudio (pactl) to set the default sink and source.
+
+    Configuration can be customized via environment variables:
+    - AUDIO_SINK_NAME: Name pattern for the correct audio output device
+    - AUDIO_SOURCE_NAME: Name pattern for the correct audio input device
+    """
+    # Get desired device names from environment or use defaults
+    desired_sink = os.getenv("AUDIO_SINK_NAME", "")
+    desired_source = os.getenv("AUDIO_SOURCE_NAME", "")
+
+    try:
+        # Check if pactl is available
+        result = subprocess.run(['which', 'pactl'], capture_output=True, timeout=5)
+        if result.returncode != 0:
+            logger.warning("pactl not found - audio configuration skipped")
+            return
+
+        # Get current default sink
+        result = subprocess.run(['pactl', 'get-default-sink'], capture_output=True, text=True, timeout=5)
+        current_sink = result.stdout.strip() if result.returncode == 0 else ""
+
+        # Get current default source
+        result = subprocess.run(['pactl', 'get-default-source'], capture_output=True, text=True, timeout=5)
+        current_source = result.stdout.strip() if result.returncode == 0 else ""
+
+        logger.info(f"Current audio sink: {current_sink}")
+        logger.info(f"Current audio source: {current_source}")
+
+        # List all available sinks
+        result = subprocess.run(['pactl', 'list', 'short', 'sinks'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and desired_sink:
+            sinks = result.stdout.strip().split('\n')
+            for sink_line in sinks:
+                if desired_sink.lower() in sink_line.lower():
+                    sink_name = sink_line.split()[1]
+                    if sink_name != current_sink:
+                        logger.info(f"Setting default sink to: {sink_name}")
+                        subprocess.run(['pactl', 'set-default-sink', sink_name], timeout=5)
+                    break
+
+        # List all available sources
+        result = subprocess.run(['pactl', 'list', 'short', 'sources'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and desired_source:
+            sources = result.stdout.strip().split('\n')
+            for source_line in sources:
+                if desired_source.lower() in source_line.lower():
+                    source_name = source_line.split()[1]
+                    if source_name != current_source:
+                        logger.info(f"Setting default source to: {source_name}")
+                        subprocess.run(['pactl', 'set-default-source', source_name], timeout=5)
+                    break
+
+        # Get updated configuration
+        result = subprocess.run(['pactl', 'get-default-sink'], capture_output=True, text=True, timeout=5)
+        final_sink = result.stdout.strip() if result.returncode == 0 else ""
+
+        result = subprocess.run(['pactl', 'get-default-source'], capture_output=True, text=True, timeout=5)
+        final_source = result.stdout.strip() if result.returncode == 0 else ""
+
+        logger.info(f"Final audio sink: {final_sink}")
+        logger.info(f"Final audio source: {final_source}")
+
+    except Exception as e:
+        logger.error(f"Error configuring audio sources: {e}")
+
 
 async def entrypoint(ctx: JobContext):
     """Main entry point for the Jetson Nano assistant"""
+    # Configure audio sources at startup
+    configure_audio_sources()
+
     session = AgentSession()
     
     await session.start(

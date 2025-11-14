@@ -12,7 +12,6 @@ from faster_whisper import WhisperModel
 
 logger = logging.getLogger("jetson-orin-nano-field-kit-voice-assistant")
 
-
 class FasterWhisperSTT(stt.STT):
     """Local STT implementation using faster_whisper"""
     
@@ -131,23 +130,21 @@ def get_stt_plugin(use_local: bool = False):
             language="en",
             beam_size=5
         )
+    else: 
+        return "assemblyai/whisper:2"
+    # # Try to use cloud STT if available
+    # try:
+    #     return "assemblyai/whisper:2"
+    # except Exception as e:
+    #     logger.warning(f"Failed to initialize AssemblyAI STT: {e}")
     
-    # Try to use cloud STT if available
-    try:
-        if os.getenv("ASSEMBLYAI_API_KEY"):
-            logger.info("Using AssemblyAI cloud STT")
-            # Use string identifier format
-            return "assemblyai/universal-streaming"
-    except Exception as e:
-        logger.warning(f"Failed to initialize AssemblyAI STT: {e}")
-    
-    # Fall back to local
-    logger.info("Falling back to local FasterWhisper STT")
-    return FasterWhisperSTT(
-        model_size="distil-small.en",
-        device="cuda",
-        compute_type="float16",
-        language="en",
-        beam_size=5
-    )
+    # # Fall back to local
+    # logger.info("Falling back to local FasterWhisper STT")
+    # return FasterWhisperSTT(
+    #     model_size="distil-small.en",
+    #     device="cuda",
+    #     compute_type="float16",
+    #     language="en",
+    #     beam_size=5
+    # )
 
