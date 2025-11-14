@@ -33,15 +33,16 @@ def check_internet_connectivity(timeout: int = 3) -> bool:
 
 def check_api_availability() -> Tuple[bool, bool]:
     """
-    Check if cloud API services are available.
+    Check if cloud API services are available from environment.
+    Only care about LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET.
     
     Returns:
-        Tuple of (has_stt_api, has_tts_api)
+        Tuple of (has_livekit_url, has_livekit_api_credentials)
     """
-    has_stt = bool(os.getenv("ASSEMBLYAI_API_KEY"))
-    has_tts = bool(os.getenv("CARTESIA_API_KEY"))
-    
-    return has_stt, has_tts
+    has_livekit_url = bool(os.getenv("LIVEKIT_URL"))
+    has_livekit_credentials = bool(os.getenv("LIVEKIT_API_KEY")) and bool(os.getenv("LIVEKIT_API_SECRET"))
+
+    return has_livekit_url, has_livekit_credentials
 
 
 def should_use_local_models() -> Tuple[bool, str]:
