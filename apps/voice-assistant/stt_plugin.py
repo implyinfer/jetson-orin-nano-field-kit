@@ -131,20 +131,5 @@ def get_stt_plugin(use_local: bool = False):
             beam_size=5
         )
     else: 
-        return "assemblyai/whisper:2"
-    # # Try to use cloud STT if available
-    # try:
-    #     return "assemblyai/whisper:2"
-    # except Exception as e:
-    #     logger.warning(f"Failed to initialize AssemblyAI STT: {e}")
-    
-    # # Fall back to local
-    # logger.info("Falling back to local FasterWhisper STT")
-    # return FasterWhisperSTT(
-    #     model_size="distil-small.en",
-    #     device="cuda",
-    #     compute_type="float16",
-    #     language="en",
-    #     beam_size=5
-    # )
+        return "assemblyai/universal-streaming"
 
