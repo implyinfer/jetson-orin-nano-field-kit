@@ -4,13 +4,13 @@ import asyncio
 import logging
 import re
 import socket
-from typing import Optional
+from typing import Annotated, Optional
 from urllib.parse import quote
 from urllib.request import urlopen
 
 from livekit.agents.llm import function_tool
 from livekit.agents.voice import RunContext
-from pydantic import Field, Annotated
+from pydantic import Field
 
 logger = logging.getLogger("jetson-orin-nano-field-kit-voice-assistant")
 
