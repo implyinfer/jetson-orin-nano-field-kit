@@ -24,6 +24,6 @@ def get_llm_plugin(use_local: bool = False):
             model="qwen3:1.7b",
             base_url="http://localhost:11434/v1"
         )
-    
+
     return "openai/gpt-4.1-mini"
 

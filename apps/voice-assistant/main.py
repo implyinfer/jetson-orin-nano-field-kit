@@ -71,8 +71,10 @@ DANGEROUS_PATTERNS = [
 use_local, local_reason = should_use_local_models()
 if use_local:
     logger.info(f"Using local models: {local_reason}")
+    print(f"Using local models: {local_reason}")
 else:
     logger.info("Using cloud models (internet and API keys available)")
+    print("Using cloud models (internet and API keys available)")
 
 # Check if Kiwix is available
 KIWIX_AVAILABLE = is_kiwix_available()
