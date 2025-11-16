@@ -36,3 +36,20 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+
+# AI/ML Models
+*.onnx
+*.onnx.json
+*.pt
+*.pth
+*.whl
+models/
+
+# Third party
+third_party/

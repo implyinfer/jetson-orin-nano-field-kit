@@ -71,9 +71,9 @@ def plot_and_save(data, title, filename, ylabel, stacked=False, legend_title=Non
 def main():
     base_url = "http://localhost:9001"
     video_path = "video_path"
-    dataset_id = "dataset_id"
-    version_id = "version_id"
-    api_key = "roboflow_api_key"
+    dataset_id = "rock-paper-scissors-sxsw"
+    version_id = "14"
+    api_key = "5yawNNvJ7gqjlloPoG0w"
     interval_minutes = args.interval_minutes * 60
 
     frames, timestamps = extract_frames(video_path, interval_minutes)

@@ -1,0 +1,27 @@
+# Roboflow Inference Requirements for Jetson Orin Nano
+# Install with: pip install -r requirements.txt
+
+# Core inference library
+inference==0.60.0
+
+# OpenCV with GUI support (QT5)
+opencv-contrib-python==4.10.0.84
+
+# Computer vision utilities
+supervision>=0.21.0
+
+# Additional dependencies
+numpy>=1.21.2
+pillow>=9.0.0
+
+# Optional but recommended
+python-dotenv>=0.19.0  # For environment variable management
+
+# Note: These packages are typically pre-installed on Jetson with JetPack:
+# - gstreamer
+# - v4l-utils
+# - ffmpeg
+#
+# If you need GPU acceleration:
+# inference-gpu==0.60.0  # Requires CUDA setup
+# onnxruntime-gpu  # For GPU-accelerated inference
