@@ -50,6 +50,7 @@ __pycache__/
 *.pth
 *.whl
 models/
+*.tar.gz
 
 # Third party
 third_party/
