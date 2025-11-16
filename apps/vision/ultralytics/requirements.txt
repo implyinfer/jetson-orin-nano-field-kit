@@ -1,0 +1,16 @@
+# YOLO Ultralytics Vision App Requirements
+# For Jetson Orin Nano with IMX-219 Camera
+
+# Core dependencies
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# Optional: For tracking and advanced features
+# lap>=0.4.0
+# scipy>=1.10.0
+
+# Note: On Jetson, you may need to install PyTorch separately
+# using the NVIDIA-provided wheel for Jetson platform:
+# https://forums.developer.nvidia.com/t/pytorch-for-jetson/72048
