@@ -1,0 +1,9 @@
+version: "3.8"
+
+services:
+  roboflow:
+    image: roboflow/roboflow-inference-server-jetson-6.0.0
+    ports:
+      - "9001:9001"
+    restart: unless-stopped
+

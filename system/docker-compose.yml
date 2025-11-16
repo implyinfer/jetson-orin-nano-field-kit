@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  kiwix:
+    image: ghcr.io/kiwix/kiwix-serve
+    ports:
+      - "8001:8080"
+    volumes:
+      - ./kiwix/data:/data
+    command: ["*.zim", "-i", "all", "-p", "6000"]
+    restart: unless-stopped
+
+  roboflow:
+    image: roboflow/roboflow-inference-server-jetson-6.0.0
+    ports:
+      - "9001:9001"
+    restart: unless-stopped
+
+  # Ultralytics is kept separate as it's typically run interactively
+  # Use: docker compose -f ultralytics/docker-compose.yml run --rm ultralytics
+
