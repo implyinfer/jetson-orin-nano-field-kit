@@ -78,10 +78,10 @@ mkdir -p ~/mediamtx
 cd ~/mediamtx
 
 # Download MediaMTX for ARM64
-wget https://github.com/bluenviron/mediamtx/releases/download/v1.9.3/mediamtx_v1.9.3_linux_arm64v8.tar.gz
+wget https://github.com/bluenviron/mediamtx/releases/download/v1.15.3/mediamtx_v1.15.3_linux_arm64.tar.gz
 
 # Extract
-tar -xzf mediamtx_v1.9.3_linux_arm64v8.tar.gz
+tar -xzf mediamtx_v1.15.3_linux_arm64.tar.gz
 
 # Make executable
 chmod +x mediamtx
