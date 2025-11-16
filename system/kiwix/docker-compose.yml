@@ -6,4 +6,3 @@ services:
       - "8001:8080"
     volumes:
       - ./data:/data
-    command: ["*.zim", "-i", "all", "-p", "6000"]
