@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  ultralytics:
+    image: ultralytics/ultralytics:latest-jetson-jetpack6
+    ipc_mode: host
+    runtime: nvidia
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/data
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+

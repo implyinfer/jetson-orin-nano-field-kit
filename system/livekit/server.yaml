@@ -1,0 +1,7 @@
+port: 7880
+ws_url: ws://0.0.0.0:7881
+keys:
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+rtc:
+  use_external_ip: true
+# add TURN, ingress/egress, logging, etc. as needed

@@ -1,0 +1,18 @@
+[Unit]
+Description=LiveKit Server (native)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=livekit
+Group=livekit
+EnvironmentFile=/etc/livekit/livekit.env
+ExecStart=/usr/local/bin/livekit-server --config /etc/livekit/server.yaml
+Restart=on-failure
+RestartSec=5
+StartLimitIntervalSec=60
+StartLimitBurst=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
