@@ -69,6 +69,12 @@ EOF
 echo "Service file created at: $TARGET_SERVICE"
 echo ""
 
+# Unmask the service if it's masked
+if systemctl is-enabled mediamtx.service 2>/dev/null | grep -q "masked"; then
+  echo "Service is masked, unmasking..."
+  systemctl unmask mediamtx.service
+fi
+
 # Reload systemd daemon
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
