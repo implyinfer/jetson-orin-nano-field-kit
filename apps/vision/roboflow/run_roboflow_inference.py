@@ -156,7 +156,7 @@ def main():
         epilog="""
 Examples:
   %(prog)s
-  %(prog)s --rtsp-url rtsp://192.168.1.171:8554/camera
+  %(prog)s --rtsp-url rtsp://localhost:8554/camera
   %(prog)s --model yolov8n-1280 --confidence 0.7
   %(prog)s --use-env
 
