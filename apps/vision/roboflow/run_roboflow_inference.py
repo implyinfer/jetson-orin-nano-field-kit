@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 """
 Roboflow Real-time Inference with RTSP Stream
 
@@ -53,7 +53,7 @@ MODEL_ALIASES = {
 # Default configuration
 DEFAULT_API_KEY = "5yawNNvJ7gqjlloPoG0w"
 DEFAULT_MODEL = "yolov8n-640"
-DEFAULT_RTSP_URL = "rtsp://localhost:8554/camera"
+DEFAULT_RTSP_URL = "rtsp://192.168.1.87:8888/cam0"
 DEFAULT_CONFIDENCE = 0.5
 
 
@@ -156,7 +156,7 @@ def main():
         epilog="""
 Examples:
   %(prog)s
-  %(prog)s --rtsp-url rtsp://192.168.1.171:8554/camera
+  %(prog)s --rtsp-url rtsp://192.168.1.87:8888/cam0
   %(prog)s --model yolov8n-1280 --confidence 0.7
   %(prog)s --use-env
 
