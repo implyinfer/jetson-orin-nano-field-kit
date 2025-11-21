@@ -19,14 +19,16 @@ This guide provides step-by-step instructions for flashing a Jetson system image
 
 ## Finding the Latest Release Image
 
-**Note:** Check the release repository for the latest release image. The example URL below is for reference only.
+**Download the latest release image from the [GitHub releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases).**
 
-Example release image URL:
+The releases page contains the most up-to-date system images. Always use the latest release image when flashing your NVMe SSD.
+
+**Note:** The example URL below is for reference only and may not be the latest version:
 ```
 https://r2.implyinfer.com/release-images/checkpoint_3.img.zst
 ```
 
-**Always use the latest release image** - check the releases page or repository for the most recent version.
+**Always check the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases) for the latest release image.**
 
 ## Step-by-Step Instructions
 

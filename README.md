@@ -1,5 +1,7 @@
 # Jetson Orin Nano Field Kit - Application Layer
 
+![Jetson Orin Nano Field Kit](images/jetson-orin-nano-field-kit-poster.png)
+
 Open source application layer for the Jetson Orin Nano Field Kit, providing AI-powered vision and voice applications optimized for edge deployment.
 
 ## Overview
@@ -38,9 +40,10 @@ System-level services configured for the Jetson Orin Nano:
 
 Before using this application layer, ensure you have:
 
-1. Flashed the Jetson Orin Nano with the system image
-2. Completed the initial setup using instructions from [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes)
-3. Verified camera detection and basic system functionality
+1. **Downloaded the latest release image** from the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases)
+2. **Flashed the Jetson Orin Nano with the system image** - See [FLASH_NVME.md](FLASH_NVME.md) for complete instructions on flashing the image to an NVMe SSD
+3. Completed the initial setup using instructions from [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes)
+4. Verified camera detection and basic system functionality
 
 ## Installation
 
@@ -255,9 +258,14 @@ sudo journalctl -u mediamtx.service -f
 
 ## Documentation
 
+- [NVMe Flashing Guide](FLASH_NVME.md) - Complete instructions for flashing the system image to an NVMe SSD
 - [RTSP Setup Guide](RTSP_SETUP.md) - Complete RTSP streaming setup
 - [Vision Application](apps/vision/roboflow/README.md) - Roboflow inference documentation
 - [Vision Quick Start](apps/vision/roboflow/QUICKSTART.md) - Quick setup guide
+
+### Release Images
+
+The latest system images are available on the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases). Always use the latest release image when flashing your NVMe SSD.
 
 ## Contributing
 
