@@ -16,13 +16,13 @@ Complete guide for setting up RTSP streaming from IMX219 cameras on Jetson Orin 
 
 ### Hardware Requirements
 - NVIDIA Jetson Orin Nano Developer Kit
-- IMX219 camera module(s) (supports up to 2 cameras)
+- Dual Stereo IMX219 camera module
 - Stable power supply (5V 4A recommended)
 - Network connection
 
 ### Software Requirements
-- JetPack 5.x or later installed
-- Ubuntu 20.04/22.04 (comes with JetPack)
+- JetPack 6.2 installed
+- Ubuntu 22.04 (comes with JetPack)
 - Internet connection for downloading MediaMTX
 
 ## Hardware Setup

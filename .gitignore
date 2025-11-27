@@ -39,7 +39,6 @@ yarn-error.log*
 
 # Python
 __pycache__/
-*.py[cod]
 *.so
 *.egg-info/
 

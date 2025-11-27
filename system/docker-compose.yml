@@ -16,6 +16,15 @@ services:
       - "9001:9001"
     restart: unless-stopped
 
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    network_mode: host
+    volumes:
+      - ${HOME}/open-webui:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://127.0.0.1:11434
+    restart: always
+
   # Ultralytics is kept separate as it's typically run interactively
   # Use: docker compose -f ultralytics/docker-compose.yml run --rm ultralytics
 

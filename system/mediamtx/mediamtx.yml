@@ -1,5 +1,6 @@
 ###############################################
 # MediaMTX Configuration for IMX219 Camera(s)
+# Optimized for ultra low-latency RTSP
 ###############################################
 
 logLevel: info
@@ -13,6 +14,8 @@ hlsAddress: :8888
 
 # WebRTC server (for low-latency web viewing)
 webrtcAddress: :8889
+webrtcICEHostNAT1To1IPs: [192.168.1.116]
+webrtcLocalUDPAddress: :8189
 
 # Authentication - allow anyone (change for production!)
 authMethod: internal
@@ -30,12 +33,10 @@ authInternalUsers:
 ###############################################
 
 paths:
-  # Single camera or Left camera (video0)
   cam0:
-    runOnInit: bash /home/box/jetson-orin-nano-field-kit/system/mediamtx/stream_cam0.sh
+    runOnInit: bash /home/box/jetson-orin-nano-field-kit/system/mediamtx/start_cam0.sh
     runOnInitRestart: yes
 
-  # Right camera (video1) - uncomment if using dual cameras
-  # cam1:
-  #   runOnInit: bash /home/box/jetson-orin-nano-field-kit/system/mediamtx/stream_cam1.sh
-  #   runOnInitRestart: yes
+  cam1:
+    runOnInit: bash /home/box/jetson-orin-nano-field-kit/system/mediamtx/start_cam1.sh
+    runOnInitRestart: yes
