@@ -237,3 +237,4 @@ def is_vision_available() -> bool:
     """Check if vision capabilities are available"""
     return is_camera_available()
 
+

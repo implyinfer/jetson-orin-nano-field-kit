@@ -1,12 +1,21 @@
-# Jetson Orin Nano Field Kit
+# Jetson Orin Nano Field Kit - Application Layer
 
-A comprehensive toolkit for the NVIDIA Jetson Orin Nano, featuring reliable camera streaming, AI inference, and edge computing capabilities.
+![Jetson Orin Nano Field Kit](images/jetson-orin-nano-field-kit-poster.png)
+
+Open source application layer for the Jetson Orin Nano Field Kit, providing AI-powered vision and voice applications optimized for edge deployment.
+
+## Overview
+
+This repository contains the application software stack for the Jetson Orin Nano Field Kit, an out of the box configured jetson orin nano developer kit setup. The kit provides dual IMX219 cameras and pre-installed AI tools for offline deployment on top of what's already provided on the jetson orin nano.
+
+This application layer is designed to work with the Jetson Orin Nano system image configured using the setup instructions in the [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes) repository and is part of the [implyinfer-landing](https://github.com/implyinfer/implyinfer-landing) project.
 
 ## Features
 
 - **Dual Camera RTSP/WebRTC Streaming** - Ultra low-latency video streaming via MediaMTX
 - **Roboflow Local Inference** - GPU-accelerated object detection with pre-downloaded models
 - **Web-based Monitoring** - Browser-accessible video streams with real-time inference overlays
+- **Voice Assistant** - Wake word-enabled assistant with tool calling and offline knowledge base
 
 ## Quick Start
 
@@ -41,6 +50,32 @@ sudo systemctl start mediamtx.service
 | cam1   | RTSP     | `rtsp://<JETSON_IP>:8554/cam1` |
 | cam1   | HLS      | `http://<JETSON_IP>:8888/cam1` |
 | cam1   | WebRTC   | `http://<JETSON_IP>:8889/cam1` |
+
+## Architecture
+
+This is a monorepo built with Turborepo, containing multiple applications and shared packages:
+
+### Applications
+
+- **Vision** (`apps/vision/roboflow`) - Real-time object detection using Roboflow inference on RTSP camera streams
+- **Voice Assistant** (`apps/voice-assistant`) - Wake word-enabled voice assistant with tool calling, Linux command execution, and offline knowledge base integration
+- **Docs** (`apps/docs`) - Documentation site built with Next.js
+
+### System Services
+
+System-level services configured for the Jetson Orin Nano:
+
+- **MediaMTX** (`system/mediamtx`) - RTSP streaming server for IMX219 camera modules
+- **LiveKit** (`system/livekit`) - Real-time communication infrastructure for voice assistant
+- **Kiwix** (`system/kiwix`) - Offline Wikipedia and knowledge base server
+- **Roboflow** (`system/roboflow`) - Docker service for Roboflow inference server
+- **Ultralytics** (`system/ultralytics`) - YOLO model inference service
+
+### Shared Packages
+
+- `packages/ui` - Shared UI components
+- `packages/eslint-config` - Shared ESLint configurations
+- `packages/typescript-config` - Shared TypeScript configurations
 
 ## Camera Streaming (MediaMTX)
 
@@ -128,26 +163,71 @@ python run_roboflow_web_stream.py --rtsp-url rtsp://127.0.0.1:8554/cam1
 python run_roboflow_web_stream.py --port 8080
 ```
 
-## Directory Structure
+## Installation
 
+### System Image Setup
+
+Before using this application layer, ensure you have:
+
+1. **Downloaded the latest release image** from the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases)
+2. **Flashed the Jetson Orin Nano with the system image** - See [FLASH_NVME.md](FLASH_NVME.md) for complete instructions on flashing the image to an NVMe SSD
+3. Completed the initial setup using instructions from [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes)
+4. Verified camera detection and basic system functionality
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit.git
+cd implyinfer-jetson-orin-nano-field-kit
 ```
-jetson-orin-nano-field-kit/
-├── apps/
-│   ├── vision/
-│   │   └── roboflow/          # Roboflow inference scripts
-│   │       ├── download_models.py
-│   │       ├── run_roboflow_web_stream.py
-│   │       └── run_stereo_disparity.py
-│   ├── dashboard/             # Web dashboard
-│   ├── docs/                  # Documentation app
-│   └── web/                   # Web applications
-├── system/
-│   ├── docker-compose.yml     # Core services
-│   └── mediamtx/              # Camera streaming
-│       ├── mediamtx.yml       # MediaMTX configuration
-│       ├── start_cam0.sh      # Camera 0 pipeline
-│       └── start_cam1.sh      # Camera 1 pipeline
-└── packages/                  # Shared packages
+
+### 2. Install Dependencies
+
+```bash
+# Install pnpm if not already installed
+npm install -g pnpm@9.0.0
+
+# Install project dependencies
+pnpm install
+```
+
+### 3. Set Up System Services
+
+```bash
+# Provision all system services
+cd system
+bash provision.sh
+```
+
+This will set up:
+- MediaMTX RTSP server
+- Kiwix offline knowledge base
+- Docker services for Roboflow and other services
+
+### 4. Configure Applications
+
+#### Vision Application
+
+```bash
+cd apps/vision/roboflow
+bash setup.sh
+
+# Configure your Roboflow API key
+nano .env
+# Add: ROBOFLOW_API_KEY=your_api_key_here
+```
+
+See [apps/vision/roboflow/README.md](apps/vision/roboflow/README.md) for detailed setup instructions.
+
+#### Voice Assistant
+
+```bash
+cd apps/voice-assistant
+bash configure.sh
+
+# Configure environment variables
+nano .env
+# Add required API keys and configuration
 ```
 
 ## Service Ports Summary
@@ -162,6 +242,105 @@ jetson-orin-nano-field-kit/
 | 8889 | MediaMTX WebRTC | Camera WebRTC streams |
 | 9001 | Roboflow Inference | GPU inference API |
 
+## Project Structure
+
+```
+.
+├── apps/
+│   ├── docs/              # Documentation site
+│   ├── scripts/           # Utility scripts
+│   ├── vision/            # Vision applications
+│   │   └── roboflow/      # Roboflow inference
+│   │       ├── download_models.py
+│   │       ├── run_roboflow_web_stream.py
+│   │       └── run_stereo_disparity.py
+│   └── voice-assistant/   # Voice assistant application
+├── packages/              # Shared packages
+│   ├── eslint-config/     # ESLint configurations
+│   ├── typescript-config/ # TypeScript configurations
+│   └── ui/                # Shared UI components
+├── system/                # System services
+│   ├── docker-compose.yml # Core services
+│   ├── kiwix/             # Kiwix offline knowledge base
+│   ├── livekit/           # LiveKit server setup
+│   ├── mediamtx/          # MediaMTX RTSP server
+│   │   ├── mediamtx.yml   # MediaMTX configuration
+│   │   ├── start_cam0.sh  # Camera 0 pipeline
+│   │   └── start_cam1.sh  # Camera 1 pipeline
+│   ├── roboflow/          # Roboflow Docker service
+│   └── ultralytics/       # Ultralytics service
+├── package.json           # Root package configuration
+├── turbo.json             # Turborepo configuration
+└── pnpm-workspace.yaml    # pnpm workspace configuration
+```
+
+## Development
+
+### Monorepo Commands
+
+```bash
+# Run all builds
+pnpm build
+
+# Run all linters
+pnpm lint
+
+# Run type checking
+pnpm check-types
+
+# Format code
+pnpm format
+
+# Run development servers
+pnpm dev
+```
+
+### Adding New Applications
+
+1. Create application directory in `apps/`
+2. Add package.json with appropriate dependencies
+3. Update `turbo.json` if custom build steps are needed
+4. Add to workspace in `pnpm-workspace.yaml` if needed
+
+### Code Style
+
+- JavaScript/TypeScript: Follows Standard.js rules (2 spaces, no semicolons, single quotes)
+- Python: Follows PEP 8 conventions
+- Use functional and declarative programming patterns
+- Prefer composition over inheritance
+
+## Troubleshooting
+
+### Camera Not Detected
+
+```bash
+# Check camera hardware
+v4l2-ctl --list-devices
+
+# Verify camera access
+ls -l /dev/video*
+```
+
+See [RTSP_SETUP.md](RTSP_SETUP.md) for detailed camera troubleshooting.
+
+### Service Issues
+
+```bash
+# Check service status
+sudo systemctl status mediamtx.service
+sudo systemctl status kiwix.service
+
+# View service logs
+sudo journalctl -u mediamtx.service -f
+```
+
+### Performance Issues
+
+- Monitor system resources: `jtop` (if installed)
+- Check thermal throttling: `cat /sys/devices/virtual/thermal/thermal_zone*/temp`
+- Adjust camera resolution/bitrate in MediaMTX configuration
+- Use smaller AI models for real-time performance
+
 ## Requirements
 
 - NVIDIA Jetson Orin Nano Developer Kit
@@ -169,6 +348,46 @@ jetson-orin-nano-field-kit/
 - Dual Stereo IMX219 camera module
 - Docker and Docker Compose
 
+## Documentation
+
+- [NVMe Flashing Guide](FLASH_NVME.md) - Complete instructions for flashing the system image to an NVMe SSD
+- [RTSP Setup Guide](RTSP_SETUP.md) - Complete RTSP streaming setup
+- [Vision Application](apps/vision/roboflow/README.md) - Roboflow inference documentation
+- [Vision Quick Start](apps/vision/roboflow/QUICKSTART.md) - Quick setup guide
+
+### Release Images
+
+The latest system images are available on the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases). Always use the latest release image when flashing your NVMe SSD.
+
+## Contributing
+
+This is an open source project. Contributions are welcome. Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes following the code style guidelines
+4. Submit a pull request
+
+## Related Projects
+
+- [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes) - System image setup instructions
+- [implyinfer-landing](https://github.com/implyinfer/implyinfer-landing) - Main project repository
+
+## Resources
+
+- [Jetson Orin Nano Developer Guide](https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit)
+- [MediaMTX Documentation](https://github.com/bluenviron/mediamtx)
+- [Roboflow Documentation](https://docs.roboflow.com/)
+- [LiveKit Documentation](https://docs.livekit.io/)
+
 ## License
 
-This project is provided as-is for educational and development purposes.
+See LICENSE file for license information.
+
+## Support
+
+For issues and questions:
+
+- Open an issue on GitHub
+- Check existing documentation in application directories
+- Refer to troubleshooting sections in individual README files
