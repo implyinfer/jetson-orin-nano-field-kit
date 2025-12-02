@@ -1,8 +1,21 @@
-# Jetson Orin Nano Field Kit - Application Layer
+<h1 align="center"><strong>Jetson Orin Nano Field Kit</strong></h1>
+
+<p align="center">
+Open source application layer for the Jetson Orin Nano Field Kit.<br>
+AI-powered vision and voice applications optimized for edge deployment.
+</p>
+
+<p align="center">
+<a href="#overview">About</a> ·
+<a href="https://www.implyinfer.com/jetson-field-kit">How to Purchase</a> ·
+<a href="#quick-start">Get Started</a> ·
+<a href="#documentation">Documentation</a> ·
+<a href="#contributing">Contributing</a>
+</p>
+
+---
 
 ![Jetson Orin Nano Field Kit](images/jetson-orin-nano-field-kit-poster.png)
-
-Open source application layer for the Jetson Orin Nano Field Kit, providing AI-powered vision and voice applications optimized for edge deployment.
 
 ## Overview
 
