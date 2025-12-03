@@ -45,28 +45,24 @@ except ImportError:
     print("Error: Missing required package 'fal-client'. Install with: pip install fal-client")
     sys.exit(1)
 
-# Get FAL_KEY from environment and configure fal_client
+# Get FAL_KEY from environment - fal_client reads from FAL_KEY env var automatically
 FAL_KEY = os.getenv('FAL_KEY')
 if not FAL_KEY:
     print("Warning: FAL_KEY not found in environment variables.")
     print("Set it in .env file or export FAL_KEY environment variable.")
     print("The script will continue but Fal.ai API calls may fail.")
 else:
-    # Configure fal_client with the API key
-    fal_client.config({
-        'credentials': FAL_KEY
-    })
     print("Fal.ai API key loaded successfully.")
 
 # Default configuration
-DEFAULT_RTSP_URL = "rtsp://127.0.0.1:8889/cam0"
+DEFAULT_RTSP_URL = "rtsp://127.0.0.1:8554/cam0"
 DEFAULT_PORT = 5003
 DEFAULT_MODEL = "fal-ai/nano-banana-pro/edit"
 DEFAULT_PROMPT = "make all the people in this image wear an orange construction hardhat. Keep the original image, only add the hardhats"
 SAVE_DIR = "data/synthetic_labeled"
 
 
-class ThreadedCamera:realtime_synthetic_labeling.py
+class ThreadedCamera:
     """
     Threaded camera capture - reads frames in background thread.
     Copied from run_roboflow_web_stream.py to ensure consistency.
@@ -156,7 +152,8 @@ class SyntheticLabelingApp:
         self.last_generation_time = 0
         self.is_generating = False
         self.generation_interval = 10 # seconds
-        self.auto_generate = True
+        self.auto_generate = False  # Disabled - use manual generation only
+        self.trigger_generation = False  # Flag for manual trigger
         
         self.lock = threading.Lock()
         
@@ -251,12 +248,19 @@ class SyntheticLabelingApp:
 
         @self.app.route('/api/discard', methods=['POST'])
         def discard_image():
-            # Just clear the current generated image from memory? 
-            # Actually, we just don't save it. The loop will overwrite it eventually.
-            # But user might want to force a new generation.
+            # Clear the current generated image
             with self.lock:
-                self.last_generation_time = 0 # Force generation soon
+                self.generated_image_data = None
             return jsonify({'status': 'discarded'})
+
+        @self.app.route('/api/generate', methods=['POST'])
+        def trigger_generate():
+            """Manually trigger a new generation"""
+            with self.lock:
+                if self.is_generating:
+                    return jsonify({'status': 'error', 'message': 'Generation already in progress'}), 400
+                self.trigger_generation = True
+            return jsonify({'status': 'ok', 'message': 'Generation triggered'})
 
     def _generate_frames(self):
         while True:
@@ -293,20 +297,24 @@ class SyntheticLabelingApp:
         return None
 
     def generation_loop(self):
-        print("Starting generation loop...")
+        print("Starting generation loop (manual trigger mode)...")
         while True:
             if not self.camera or not self.camera.connected:
                 time.sleep(1)
                 continue
 
-            now = time.time()
             should_generate = False
-            
+
             with self.lock:
-                if self.auto_generate and not self.is_generating:
+                # Check for manual trigger or auto-generate (if enabled)
+                if self.trigger_generation and not self.is_generating:
+                    should_generate = True
+                    self.trigger_generation = False
+                elif self.auto_generate and not self.is_generating:
+                    now = time.time()
                     if now - self.last_generation_time >= self.generation_interval:
                         should_generate = True
-            
+
             if should_generate:
                 # Capture state for generation
                 captured_frame = None
@@ -322,14 +330,14 @@ class SyntheticLabelingApp:
                 if captured_frame is not None:
                     print(f"Generating image with prompt: {prompt[:30]}...")
                     try:
-                        # Convert to base64 for Fal
-                        image_url = self._encode_image_to_base64(captured_frame)
-                        
-                        # Call Fal API
+                        # Convert to base64 data URI for Fal
+                        image_data_uri = self._encode_image_to_base64(captured_frame)
+
+                        # Call Fal API - expects image_urls as an array
                         result = fal_client.submit(
                             self.model_id,
                             arguments={
-                                "image_url": image_url,
+                                "image_urls": [image_data_uri],
                                 "prompt": prompt
                             }
                         )
@@ -390,6 +398,8 @@ class SyntheticLabelingApp:
         .btn-save { background: #2ecc71; color: white; }
         .btn-discard { background: #e74c3c; color: white; }
         .btn-update { background: #3498db; color: white; }
+        .btn-generate { background: #9b59b6; color: white; }
+        .btn-generate:disabled { background: #666; cursor: not-allowed; }
         .status { margin-top: 10px; color: #aaa; font-size: 0.9em; }
         .loading { color: #f39c12; display: none; }
     </style>
@@ -420,7 +430,8 @@ class SyntheticLabelingApp:
         <div>
             <label>Prompt:</label>
             <textarea id="prompt-input">{{ prompt }}</textarea>
-            <button class="btn-update" onclick="updatePrompt()">Update Prompt & Regenerate</button>
+            <button class="btn-update" onclick="updatePrompt()">Update Prompt</button>
+            <button class="btn-generate" id="generate-btn" onclick="generateImage()">Generate Image</button>
         </div>
         
         <div style="margin-top: 20px; border-top: 1px solid #555; padding-top: 20px;">
@@ -450,10 +461,15 @@ class SyntheticLabelingApp:
                 const placeholder = document.getElementById('placeholder');
                 const indicator = document.getElementById('generating-indicator');
                 
+                const generateBtn = document.getElementById('generate-btn');
                 if (data.is_generating) {
                     indicator.style.display = 'block';
+                    generateBtn.disabled = true;
+                    generateBtn.textContent = 'Generating...';
                 } else {
                     indicator.style.display = 'none';
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'Generate Image';
                 }
 
                 if (data.image && data.image !== currentImageUrl) {
@@ -478,9 +494,23 @@ class SyntheticLabelingApp:
                     body: JSON.stringify({prompt})
                 });
                 const data = await res.json();
-                updateStatus('Prompt updated. Waiting for generation...');
+                updateStatus('Prompt updated.');
             } catch (e) {
                 updateStatus('Error updating prompt', true);
+            }
+        }
+
+        async function generateImage() {
+            try {
+                const res = await fetch('/api/generate', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    updateStatus('Generation started...');
+                } else {
+                    updateStatus('Error: ' + data.message, true);
+                }
+            } catch (e) {
+                updateStatus('Error triggering generation', true);
             }
         }
 

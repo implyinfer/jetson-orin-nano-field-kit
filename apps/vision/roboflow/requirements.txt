@@ -16,6 +16,8 @@ pillow>=9.0.0
 
 # Optional but recommended
 python-dotenv>=0.19.0  # For environment variable management
+flask>=2.0.0  # For web interface
+fal-client>=0.5.0  # For Fal.ai synthetic image generation
 
 # Note: These packages are typically pre-installed on Jetson with JetPack:
 # - gstreamer
