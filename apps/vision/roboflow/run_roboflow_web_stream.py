@@ -30,11 +30,20 @@ import numpy as np
 try:
     from inference_sdk import InferenceHTTPClient
     import supervision as sv
-    from flask import Flask, Response, render_template_string
+    from flask import Flask, Response, render_template_string, jsonify
 except ImportError as e:
     print(f"Error: Missing required package - {e}")
     print("Install with: pip install inference-sdk supervision flask")
     sys.exit(1)
+
+# Optional IMU support
+try:
+    from icm20948 import ThreadedIMU
+    IMU_AVAILABLE = True
+    print("IMU module loaded successfully")
+except ImportError as e:
+    IMU_AVAILABLE = False
+    print(f"IMU module not available: {e}")
 
 
 # Default configuration
@@ -123,7 +132,7 @@ class ThreadedCamera:
 class WebStreamInference:
     """Roboflow inference with web streaming using InferenceHTTPClient"""
 
-    def __init__(self, model_id, rtsp_url, confidence=0.5, port=5000, inference_server=None):
+    def __init__(self, model_id, rtsp_url, confidence=0.5, port=5000, inference_server=None, enable_imu=True):
         """
         Initialize inference with web streaming
 
@@ -133,6 +142,7 @@ class WebStreamInference:
             confidence: Detection confidence threshold (0.0-1.0)
             port: Web server port
             inference_server: URL of inference server (e.g., http://localhost:9001)
+            enable_imu: Enable IMU sensor data overlay (default: True)
         """
         self.model_id = model_id
         self.rtsp_url = rtsp_url
@@ -159,6 +169,29 @@ class WebStreamInference:
         self.box_annotator = sv.BoxAnnotator()
         self.label_annotator = sv.LabelAnnotator()
 
+        # IMU sensor
+        self.imu = None
+        self.imu_available = False
+        print(f"IMU init: enable_imu={enable_imu}, IMU_AVAILABLE={IMU_AVAILABLE}")
+        if enable_imu and IMU_AVAILABLE:
+            try:
+                print("Creating ThreadedIMU...")
+                self.imu = ThreadedIMU()
+                print("Starting IMU...")
+                if self.imu.start():
+                    self.imu_available = True
+                    print("IMU sensor initialized successfully")
+                else:
+                    print("IMU sensor start() returned False")
+                    self.imu = None
+            except Exception as e:
+                import traceback
+                print(f"Failed to initialize IMU: {e}")
+                traceback.print_exc()
+                self.imu = None
+        else:
+            print(f"IMU skipped: enable_imu={enable_imu}, IMU_AVAILABLE={IMU_AVAILABLE}")
+
         # Flask app
         self.app = Flask(__name__)
         self._setup_routes()
@@ -174,71 +207,503 @@ class WebStreamInference:
             <html>
             <head>
                 <title>Roboflow Live Stream</title>
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
                 <style>
-                    body {
+                    * {
                         margin: 0;
-                        padding: 20px;
-                        background-color: #1a1a1a;
-                        color: #ffffff;
-                        font-family: Arial, sans-serif;
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
+                        padding: 0;
+                        box-sizing: border-box;
                     }
-                    h1 { margin-bottom: 20px; }
-                    .video-container {
-                        max-width: 100%;
-                        border: 2px solid #333;
-                        border-radius: 8px;
+                    html, body {
+                        width: 100%;
+                        height: 100%;
                         overflow: hidden;
-                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+                        background-color: #000;
                     }
-                    img { width: 100%; height: auto; display: block; }
-                    .info {
-                        margin-top: 20px;
-                        padding: 15px;
-                        background-color: #2a2a2a;
-                        border-radius: 8px;
-                        max-width: 800px;
+                    .video-container {
+                        position: relative;
+                        width: 100vw;
+                        height: 100vh;
                     }
-                    .info p { margin: 5px 0; }
-                    .status {
-                        display: inline-block;
-                        width: 10px;
-                        height: 10px;
-                        border-radius: 50%;
-                        background-color: #00ff00;
-                        margin-right: 5px;
-                        animation: pulse 2s infinite;
+                    img {
+                        width: 100%;
+                        height: 100%;
+                        object-fit: contain;
+                        display: block;
                     }
-                    @keyframes pulse {
-                        0%, 100% { opacity: 1; }
-                        50% { opacity: 0.3; }
+                    .overlay {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        background-color: rgba(0, 0, 0, 0.7);
+                        color: #fff;
+                        padding: 10px 15px;
+                        border-radius: 6px;
+                        font-family: 'Courier New', monospace;
+                        font-size: 14px;
+                    }
+                    .overlay .model-name {
+                        font-weight: bold;
+                        color: #00ff00;
+                        margin-bottom: 5px;
+                    }
+                    .imu-container {
+                        position: absolute;
+                        bottom: 15px;
+                        right: 15px;
+                        width: 220px;
+                        height: 280px;
+                        background: linear-gradient(145deg, rgba(20, 25, 35, 0.9), rgba(10, 15, 25, 0.95));
+                        border-radius: 12px;
+                        border: 1px solid rgba(100, 200, 255, 0.3);
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+                        overflow: hidden;
+                    }
+                    .imu-header {
+                        padding: 10px 12px 8px;
+                        border-bottom: 1px solid rgba(100, 200, 255, 0.2);
+                        background: rgba(0, 150, 255, 0.1);
+                    }
+                    .imu-title {
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: #64c8ff;
+                        text-transform: uppercase;
+                        letter-spacing: 1.5px;
+                    }
+                    #imu-canvas {
+                        width: 100%;
+                        height: 160px;
+                        display: block;
+                    }
+                    .imu-data {
+                        padding: 8px 12px;
+                        font-family: 'SF Mono', 'Consolas', monospace;
+                        font-size: 11px;
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 4px;
+                        background: rgba(0, 0, 0, 0.3);
+                    }
+                    .imu-axis {
+                        text-align: center;
+                        padding: 4px;
+                        border-radius: 4px;
+                        background: rgba(255, 255, 255, 0.03);
+                    }
+                    .imu-axis-label {
+                        font-size: 9px;
+                        color: #888;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                    .imu-axis-value {
+                        font-size: 13px;
+                        font-weight: bold;
+                        margin-top: 2px;
+                    }
+                    .roll-color { color: #ff6b6b; }
+                    .pitch-color { color: #4ecdc4; }
+                    .yaw-color { color: #ffe66d; }
+                    .imu-unavailable {
+                        display: none;
+                    }
+                    .calibrate-btn {
+                        position: absolute;
+                        bottom: 8px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background: rgba(100, 200, 255, 0.2);
+                        border: 1px solid rgba(100, 200, 255, 0.4);
+                        color: #64c8ff;
+                        padding: 4px 12px;
+                        border-radius: 4px;
+                        font-size: 9px;
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        cursor: pointer;
+                        transition: all 0.2s;
+                    }
+                    .calibrate-btn:hover {
+                        background: rgba(100, 200, 255, 0.3);
+                        border-color: rgba(100, 200, 255, 0.6);
+                    }
+                    .calibrate-btn:active {
+                        transform: translateX(-50%) scale(0.95);
+                    }
+                    .imu-status {
+                        position: absolute;
+                        top: 8px;
+                        right: 10px;
+                        font-size: 8px;
+                        color: #4a4a4a;
+                    }
+                    .imu-status.calibrated {
+                        color: #4ecdc4;
                     }
                 </style>
             </head>
             <body>
-                <h1>Roboflow Live Object Detection</h1>
                 <div class="video-container">
                     <img src="{{ url_for('video_feed') }}" alt="Live Stream">
+                    <div class="overlay">
+                        <div class="model-name">{{ model_id }}</div>
+                    </div>
+                    <div class="imu-container {% if not imu_available %}imu-unavailable{% endif %}" id="imu-container">
+                        <div class="imu-header">
+                            <div class="imu-title">9-DOF IMU Orientation</div>
+                            <div class="imu-status" id="imu-status">NOT CALIBRATED</div>
+                        </div>
+                        <canvas id="imu-canvas"></canvas>
+                        <div class="imu-data">
+                            <div class="imu-axis">
+                                <div class="imu-axis-label">Roll</div>
+                                <div class="imu-axis-value roll-color" id="imu-roll">0.0°</div>
+                            </div>
+                            <div class="imu-axis">
+                                <div class="imu-axis-label">Pitch</div>
+                                <div class="imu-axis-value pitch-color" id="imu-pitch">0.0°</div>
+                            </div>
+                            <div class="imu-axis">
+                                <div class="imu-axis-label">Yaw</div>
+                                <div class="imu-axis-value yaw-color" id="imu-yaw">0.0°</div>
+                            </div>
+                        </div>
+                        <button class="calibrate-btn" id="calibrate-btn" onclick="calibrateIMU()">Reset Level</button>
+                    </div>
                 </div>
-                <div class="info">
-                    <p><span class="status"></span> <strong>Status:</strong> Streaming</p>
-                    <p><strong>Model:</strong> {{ model_id }}</p>
-                    <p><strong>Inference Server:</strong> {{ inference_server }}</p>
-                    <p><strong>Stream:</strong> {{ rtsp_url }}</p>
-                    <p><strong>Confidence:</strong> {{ confidence }}</p>
-                </div>
+                {% if imu_available %}
+                <script>
+                    // Three.js IMU Visualization
+                    let scene, camera, renderer, deviceGroup, gyroRings;
+                    let targetRoll = 0, targetPitch = 0, targetYaw = 0;
+                    let currentRoll = 0, currentPitch = 0, currentYaw = 0;
+                    let isCalibrated = false;
+
+                    function calibrateIMU() {
+                        fetch('/api/imu/calibrate', { method: 'POST' })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    isCalibrated = true;
+                                    const status = document.getElementById('imu-status');
+                                    status.textContent = 'CALIBRATED';
+                                    status.classList.add('calibrated');
+                                    // Reset current positions for smooth transition
+                                    currentRoll = 0;
+                                    currentPitch = 0;
+                                    currentYaw = 0;
+                                }
+                            })
+                            .catch(err => console.error('Calibration error:', err));
+                    }
+
+                    function initThreeJS() {
+                        const canvas = document.getElementById('imu-canvas');
+                        const width = canvas.clientWidth;
+                        const height = canvas.clientHeight;
+
+                        // Scene
+                        scene = new THREE.Scene();
+
+                        // Camera - positioned to view device from front-right, slightly above
+                        // This shows the cameras facing away (toward -Z) as if device is on table in front of you
+                        camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+                        camera.position.set(2.5, 1.8, 3.5);
+                        camera.lookAt(0, 0, 0);
+
+                        // Renderer
+                        renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+                        renderer.setSize(width, height);
+                        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                        // Lighting
+                        const ambientLight = new THREE.AmbientLight(0x404050, 0.5);
+                        scene.add(ambientLight);
+
+                        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                        directionalLight.position.set(5, 5, 5);
+                        scene.add(directionalLight);
+
+                        const backLight = new THREE.DirectionalLight(0x4080ff, 0.3);
+                        backLight.position.set(-3, 2, -3);
+                        scene.add(backLight);
+
+                        // Device group (will rotate with IMU)
+                        deviceGroup = new THREE.Group();
+                        scene.add(deviceGroup);
+
+                        // Create Jetson-like device body
+                        const bodyGeom = new THREE.BoxGeometry(1.4, 0.25, 1.0);
+                        const bodyMat = new THREE.MeshPhongMaterial({
+                            color: 0x1a1a1a,
+                            specular: 0x333333,
+                            shininess: 30
+                        });
+                        const body = new THREE.Mesh(bodyGeom, bodyMat);
+                        deviceGroup.add(body);
+
+                        // Green PCB accent
+                        const pcbGeom = new THREE.BoxGeometry(1.35, 0.02, 0.95);
+                        const pcbMat = new THREE.MeshPhongMaterial({
+                            color: 0x1b5e20,
+                            specular: 0x2e7d32,
+                            shininess: 50
+                        });
+                        const pcb = new THREE.Mesh(pcbGeom, pcbMat);
+                        pcb.position.y = 0.13;
+                        deviceGroup.add(pcb);
+
+                        // Heatsink fins
+                        const finMat = new THREE.MeshPhongMaterial({
+                            color: 0x37474f,
+                            specular: 0x607d8b,
+                            shininess: 60
+                        });
+                        for (let i = -4; i <= 4; i++) {
+                            const finGeom = new THREE.BoxGeometry(0.8, 0.15, 0.03);
+                            const fin = new THREE.Mesh(finGeom, finMat);
+                            fin.position.set(0.1, 0.2, i * 0.1);
+                            deviceGroup.add(fin);
+                        }
+
+                        // Dual IMX219 Cameras
+                        const camMat = new THREE.MeshPhongMaterial({
+                            color: 0x263238,
+                            specular: 0x455a64,
+                            shininess: 40
+                        });
+                        const lensMat = new THREE.MeshPhongMaterial({
+                            color: 0x0d47a1,
+                            specular: 0x42a5f5,
+                            shininess: 100,
+                            transparent: true,
+                            opacity: 0.9
+                        });
+
+                        // Camera positions (front of device)
+                        [-0.35, 0.35].forEach(x => {
+                            // Camera housing
+                            const camBody = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.2, 0.15, 0.12),
+                                camMat
+                            );
+                            camBody.position.set(x, 0.2, -0.56);
+                            deviceGroup.add(camBody);
+
+                            // Lens
+                            const lens = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.05, 0.06, 0.08, 16),
+                                lensMat
+                            );
+                            lens.rotation.x = Math.PI / 2;
+                            lens.position.set(x, 0.2, -0.64);
+                            deviceGroup.add(lens);
+
+                            // Lens ring
+                            const ringGeom = new THREE.TorusGeometry(0.055, 0.01, 8, 24);
+                            const ringMat = new THREE.MeshPhongMaterial({ color: 0x212121 });
+                            const ring = new THREE.Mesh(ringGeom, ringMat);
+                            ring.rotation.x = Math.PI / 2;
+                            ring.position.set(x, 0.2, -0.68);
+                            deviceGroup.add(ring);
+                        });
+
+                        // NVIDIA logo placeholder (green glow)
+                        const logoGeom = new THREE.PlaneGeometry(0.3, 0.1);
+                        const logoMat = new THREE.MeshBasicMaterial({
+                            color: 0x76b900,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const logo = new THREE.Mesh(logoGeom, logoMat);
+                        logo.rotation.x = -Math.PI / 2;
+                        logo.position.set(-0.4, 0.14, 0.3);
+                        deviceGroup.add(logo);
+
+                        // Create gyroscopic rings
+                        gyroRings = new THREE.Group();
+                        scene.add(gyroRings);
+
+                        // Outer ring (Yaw - Yellow)
+                        const ring1Geom = new THREE.TorusGeometry(1.6, 0.015, 16, 64);
+                        const ring1Mat = new THREE.MeshBasicMaterial({
+                            color: 0xffe66d,
+                            transparent: true,
+                            opacity: 0.6
+                        });
+                        const ring1 = new THREE.Mesh(ring1Geom, ring1Mat);
+                        gyroRings.add(ring1);
+
+                        // Middle ring (Pitch - Cyan)
+                        const ring2Geom = new THREE.TorusGeometry(1.4, 0.015, 16, 64);
+                        const ring2Mat = new THREE.MeshBasicMaterial({
+                            color: 0x4ecdc4,
+                            transparent: true,
+                            opacity: 0.6
+                        });
+                        const ring2 = new THREE.Mesh(ring2Geom, ring2Mat);
+                        ring2.rotation.y = Math.PI / 2;
+                        gyroRings.add(ring2);
+
+                        // Inner ring (Roll - Red)
+                        const ring3Geom = new THREE.TorusGeometry(1.2, 0.015, 16, 64);
+                        const ring3Mat = new THREE.MeshBasicMaterial({
+                            color: 0xff6b6b,
+                            transparent: true,
+                            opacity: 0.6
+                        });
+                        const ring3 = new THREE.Mesh(ring3Geom, ring3Mat);
+                        ring3.rotation.x = Math.PI / 2;
+                        gyroRings.add(ring3);
+
+                        // Axis lines
+                        const axisLen = 1.8;
+                        const axisMat = {
+                            x: new THREE.LineBasicMaterial({ color: 0xff6b6b, transparent: true, opacity: 0.4 }),
+                            y: new THREE.LineBasicMaterial({ color: 0x4ecdc4, transparent: true, opacity: 0.4 }),
+                            z: new THREE.LineBasicMaterial({ color: 0xffe66d, transparent: true, opacity: 0.4 })
+                        };
+
+                        // X axis (Roll)
+                        const xGeom = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(-axisLen, 0, 0),
+                            new THREE.Vector3(axisLen, 0, 0)
+                        ]);
+                        scene.add(new THREE.Line(xGeom, axisMat.x));
+
+                        // Y axis (Pitch)
+                        const yGeom = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(0, -axisLen, 0),
+                            new THREE.Vector3(0, axisLen, 0)
+                        ]);
+                        scene.add(new THREE.Line(yGeom, axisMat.y));
+
+                        // Z axis (Yaw)
+                        const zGeom = new THREE.BufferGeometry().setFromPoints([
+                            new THREE.Vector3(0, 0, -axisLen),
+                            new THREE.Vector3(0, 0, axisLen)
+                        ]);
+                        scene.add(new THREE.Line(zGeom, axisMat.z));
+
+                        // Grid helper (subtle)
+                        const gridHelper = new THREE.GridHelper(4, 20, 0x2a2a3a, 0x1a1a2a);
+                        gridHelper.position.y = -1;
+                        scene.add(gridHelper);
+
+                        animate();
+                    }
+
+                    function animate() {
+                        requestAnimationFrame(animate);
+
+                        // Smooth interpolation
+                        const smoothing = 0.15;
+                        currentRoll += (targetRoll - currentRoll) * smoothing;
+                        currentPitch += (targetPitch - currentPitch) * smoothing;
+                        currentYaw += (targetYaw - currentYaw) * smoothing;
+
+                        // Apply rotation to device (convert degrees to radians)
+                        deviceGroup.rotation.z = currentRoll * Math.PI / 180;
+                        deviceGroup.rotation.x = currentPitch * Math.PI / 180;
+                        deviceGroup.rotation.y = currentYaw * Math.PI / 180;
+
+                        // Animate gyro rings subtly
+                        const time = Date.now() * 0.001;
+                        gyroRings.children[0].rotation.z = time * 0.1;
+                        gyroRings.children[1].rotation.z = time * 0.15;
+                        gyroRings.children[2].rotation.y = time * 0.12;
+
+                        renderer.render(scene, camera);
+                    }
+
+                    function updateIMU() {
+                        fetch('/api/imu')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.available) {
+                                    targetRoll = data.roll;
+                                    targetPitch = data.pitch;
+                                    targetYaw = data.yaw;
+
+                                    document.getElementById('imu-roll').textContent = data.roll.toFixed(1) + '°';
+                                    document.getElementById('imu-pitch').textContent = data.pitch.toFixed(1) + '°';
+                                    document.getElementById('imu-yaw').textContent = data.yaw.toFixed(1) + '°';
+
+                                    // Update calibration status display
+                                    if (data.calibrated && !isCalibrated) {
+                                        isCalibrated = true;
+                                        const status = document.getElementById('imu-status');
+                                        status.textContent = 'CALIBRATED';
+                                        status.classList.add('calibrated');
+                                    }
+                                }
+                            })
+                            .catch(err => console.error('IMU fetch error:', err));
+                    }
+
+                    // Initialize
+                    window.addEventListener('load', () => {
+                        initThreeJS();
+                        // Auto-calibrate on first load after a short delay to let IMU stabilize
+                        setTimeout(() => {
+                            calibrateIMU();
+                        }, 500);
+                        setInterval(updateIMU, 50);
+                        updateIMU();
+                    });
+                </script>
+                {% endif %}
             </body>
             </html>
             """
             return render_template_string(
                 html,
                 model_id=self.model_id,
-                rtsp_url=self.rtsp_url,
-                confidence=self.confidence,
-                inference_server=self.inference_server
+                imu_available=self.imu_available
             )
+
+        # Store initial IMU offset for calibration
+        self._imu_offset = {'roll': 0, 'pitch': 0, 'yaw': 0}
+        self._imu_calibrated = False
+
+        @self.app.route('/api/imu')
+        def get_imu_data():
+            """API endpoint for IMU data"""
+            if self.imu_available and self.imu:
+                angles = self.imu.get_angles()
+                # Apply calibration offset
+                return jsonify({
+                    'available': True,
+                    'roll': angles.roll - self._imu_offset['roll'],
+                    'pitch': angles.pitch - self._imu_offset['pitch'],
+                    'yaw': angles.yaw - self._imu_offset['yaw'],
+                    'calibrated': self._imu_calibrated
+                })
+            else:
+                return jsonify({
+                    'available': False,
+                    'roll': 0,
+                    'pitch': 0,
+                    'yaw': 0,
+                    'calibrated': False
+                })
+
+        @self.app.route('/api/imu/calibrate', methods=['POST'])
+        def calibrate_imu():
+            """Calibrate IMU - set current position as zero reference"""
+            if self.imu_available and self.imu:
+                angles = self.imu.get_angles()
+                self._imu_offset = {
+                    'roll': angles.roll,
+                    'pitch': angles.pitch,
+                    'yaw': angles.yaw
+                }
+                self._imu_calibrated = True
+                return jsonify({'success': True, 'offset': self._imu_offset})
+            return jsonify({'success': False})
 
         @self.app.route('/video_feed')
         def video_feed():
@@ -365,6 +830,7 @@ class WebStreamInference:
         print(f"Confidence:          {self.confidence}")
         print(f"Web Server Port:     {self.port}")
         print(f"Inference Server:    {self.inference_server}")
+        print(f"IMU Sensor:          {'Available' if self.imu_available else 'Not available'}")
         print("=" * 70)
 
         # Start inference loop in background thread
@@ -386,6 +852,8 @@ class WebStreamInference:
         except KeyboardInterrupt:
             print("\n\nStopping...")
             self.running = False
+            if self.imu:
+                self.imu.stop()
             print("Stopped.")
 
 
@@ -416,6 +884,8 @@ Available Models (cached locally):
                         help=f'Web server port (default: {DEFAULT_PORT})')
     parser.add_argument('--inference-server', '-s', type=str, default=DEFAULT_INFERENCE_SERVER,
                         help=f'Inference server URL (default: {DEFAULT_INFERENCE_SERVER})')
+    parser.add_argument('--no-imu', action='store_true',
+                        help='Disable IMU sensor overlay')
 
     args = parser.parse_args()
 
@@ -428,7 +898,8 @@ Available Models (cached locally):
         rtsp_url=args.rtsp_url,
         confidence=args.confidence,
         port=args.port,
-        inference_server=args.inference_server
+        inference_server=args.inference_server,
+        enable_imu=not args.no_imu
     )
 
     web_stream.run()
