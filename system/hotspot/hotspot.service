@@ -1,0 +1,19 @@
+[Unit]
+Description=WiFi Hotspot for Jetson Field Kit
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/home/box/jetson-orin-nano-field-kit/system/hotspot/hotspot.conf
+ExecStart=/home/box/jetson-orin-nano-field-kit/system/hotspot/setup-hotspot.sh
+ExecStop=/home/box/jetson-orin-nano-field-kit/system/hotspot/setup-hotspot.sh --stop
+
+# Wait for WiFi to connect before starting hotspot
+ExecStartPre=/bin/bash -c 'for i in {1..30}; do nmcli -t -f STATE g 2>/dev/null | grep -q connected && exit 0; sleep 2; done; exit 1'
+
+[Install]
+WantedBy=multi-user.target
