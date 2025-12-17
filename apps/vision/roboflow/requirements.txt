@@ -2,8 +2,8 @@
 # Install with: pip install -r requirements.txt
 
 # Core inference library
-inference==0.60.0
-
+inference==0.62.5
+inference_sdk==0.62.5
 # OpenCV with GUI support (QT5)
 opencv-contrib-python==4.10.0.84
 

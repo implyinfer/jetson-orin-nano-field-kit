@@ -12,7 +12,7 @@ sleep 4
 gst-launch-1.0 -e \
   nvarguscamerasrc sensor-id=1 ! \
   'video/x-raw(memory:NVMM),width=1280,height=720,framerate=30/1' ! \
-  nvvidconv flip-method=2 ! \
+  nvvidconv flip-method=0 ! \
   'video/x-raw,format=I420' ! \
   queue max-size-buffers=1 max-size-time=0 max-size-bytes=0 leaky=upstream ! \
   x264enc \

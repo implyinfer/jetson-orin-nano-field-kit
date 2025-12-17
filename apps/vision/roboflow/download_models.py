@@ -28,9 +28,9 @@ import requests
 
 MODELS_TO_PRELOAD = [
     # RF-DETR
+    "rfdetr-nano",
     "rfdetr-small",
     "rfdetr-medium",
-    # (leave out rfdetr-nano for now since it's currently failing)
 
     # YOLOv11
     "yolov11n-640",
@@ -101,22 +101,69 @@ def main() -> int:
     )
     parser.add_argument(
         "--cache-dir",
-        default="/home/box/roboflow-cache",
+        default="/var/cache/roboflow",
         help="Host cache directory (for size reporting and state file)",
+    )
+    parser.add_argument(
+        "--remove",
+        nargs="+",
+        metavar="MODEL",
+        help="Remove model(s) from state file (cache files remain)",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_state",
+        help="List models in state file and exit",
     )
     args = parser.parse_args()
 
     cache_path = Path(args.cache_dir)
     state_path = cache_path / "preloaded_models.json"
 
-    # client setup
+    # state
+    already_preloaded = load_state(state_path)
+
+    # Handle --list command
+    if args.list_state:
+        print(f"State file: {state_path}")
+        print(f"Cache dir:  {cache_path}")
+        print(f"Cache size: {human_bytes(get_dir_size(cache_path))}")
+        print(f"\nModels in state file ({len(already_preloaded)}):")
+        if already_preloaded:
+            for m in sorted(already_preloaded):
+                in_list = "✓" if m in MODELS_TO_PRELOAD else "  (not in MODELS_TO_PRELOAD)"
+                print(f"  - {m} {in_list}")
+        else:
+            print("  (none)")
+        return 0
+
+    # Handle --remove command
+    if args.remove:
+        print(f"State file: {state_path}")
+        print(f"Cache dir:  {cache_path}")
+        print(f"\nRemoving models from state file (cache files will remain):")
+        removed = []
+        not_found = []
+        for model in args.remove:
+            if model in already_preloaded:
+                already_preloaded.remove(model)
+                removed.append(model)
+                print(f"  ✓ Removed: {model}")
+            else:
+                not_found.append(model)
+                print(f"  ⚠ Not in state: {model}")
+        if removed:
+            save_state(state_path, already_preloaded)
+            print(f"\nSaved updated state file ({len(already_preloaded)} models remaining)")
+        print(f"\nCache size: {human_bytes(get_dir_size(cache_path))} (unchanged)")
+        return 0
+
+    # client setup (only needed for loading models)
     client_kwargs = {"api_url": args.api_url}
     if os.getenv("RF_API_KEY"):
         client_kwargs["api_key"] = os.environ["RF_API_KEY"]
     client = InferenceHTTPClient(**client_kwargs)
-
-    # state
-    already_preloaded = load_state(state_path)
 
     print("=" * 70)
     print("Simple Roboflow Model Preloader")

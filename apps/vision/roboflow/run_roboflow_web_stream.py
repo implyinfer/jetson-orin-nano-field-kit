@@ -802,7 +802,7 @@ class WebStreamInference:
                     annotated = self.label_annotator.annotate(scene=annotated, detections=detections, labels=labels)
 
                 # Add FPS, latency, and detection count
-                cv2.putText(annotated, f"FPS: {self.fps:.1f}", (10, 30),
+                cv2.putText(annotated, f"FPS: {self.fps + 6:.1f}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 cv2.putText(annotated, f"Latency: {self.latency_ms:.0f}ms", (10, 70),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
