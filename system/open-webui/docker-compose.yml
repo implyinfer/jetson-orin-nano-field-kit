@@ -10,4 +10,4 @@ services:
       - WEBUI_AUTH=False
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: always
+    restart: "no"

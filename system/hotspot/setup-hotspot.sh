@@ -32,7 +32,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOTSPOT_SSID="${HOTSPOT_SSID:-JetsonFieldKit}"
 HOTSPOT_PASSWORD="${HOTSPOT_PASSWORD:-fieldkit123}"
 HOTSPOT_CHANNEL="${HOTSPOT_CHANNEL:-1}"
-AP_INTERFACE=""
+AP_INTERFACE="${AP_INTERFACE:-}"
 PERSIST_RULES=false
 ACTION="start"
 
@@ -257,15 +257,68 @@ restart_avahi() {
     fi
 }
 
+# Clean up any auto-created WiFi connections on the AP interface
+cleanup_ap_interface() {
+    local ap_if="$1"
+
+    log_info "Cleaning up auto-created connections on $ap_if..."
+
+    # Get all connections currently using the AP interface (except Hotspot)
+    local connections
+    connections=$(nmcli -t -f NAME,DEVICE con show --active 2>/dev/null | grep ":${ap_if}$" | cut -d: -f1 | grep -v "^Hotspot$") || true
+
+    for conn in $connections; do
+        log_info "  Disconnecting: $conn"
+        nmcli con down "$conn" 2>/dev/null || true
+    done
+
+    # Delete any duplicate WiFi connections that might auto-connect on AP interface
+    # These are typically created when NM auto-connects the USB adapter to known networks
+    local all_wifi_connections
+    all_wifi_connections=$(nmcli -t -f NAME,TYPE con show 2>/dev/null | grep ":802-11-wireless$" | cut -d: -f1) || true
+
+    for conn in $all_wifi_connections; do
+        # Skip the Hotspot connection
+        if [ "$conn" = "Hotspot" ]; then
+            continue
+        fi
+
+        # Check if this connection is bound to the AP interface
+        local conn_interface
+        conn_interface=$(nmcli -t -f connection.interface-name con show "$conn" 2>/dev/null | cut -d: -f2) || true
+
+        if [ "$conn_interface" = "$ap_if" ]; then
+            log_info "  Deleting connection bound to AP interface: $conn"
+            nmcli con delete "$conn" 2>/dev/null || true
+        fi
+
+        # Also check for duplicate connections (e.g., "NetworkName 1", "NetworkName 2")
+        if [[ "$conn" =~ [[:space:]][0-9]+$ ]]; then
+            log_info "  Deleting duplicate connection: $conn"
+            nmcli con delete "$conn" 2>/dev/null || true
+        fi
+    done
+}
+
 # Main setup function
 setup_hotspot() {
     log_info "Setting up WiFi hotspot..."
     log_info "  SSID: $HOTSPOT_SSID"
     log_info "  Password: ${HOTSPOT_PASSWORD:0:3}***"
 
+    # If AP_INTERFACE is specified, verify it exists first
+    if [ -n "$AP_INTERFACE" ]; then
+        if ! ip link show "$AP_INTERFACE" &>/dev/null; then
+            log_warn "Specified AP interface '$AP_INTERFACE' not found"
+            log_warn "USB WiFi adapter may not be connected - skipping hotspot setup"
+            exit 0  # Exit gracefully, don't retry
+        fi
+        log_info "Using configured AP interface: $AP_INTERFACE"
+    fi
+
     # Find STA interface (connected to internet)
     local sta_if
-    sta_if=$(get_sta_interface)
+    sta_if=$(get_sta_interface) || true
 
     if [ -z "$sta_if" ]; then
         log_error "No WiFi interface connected to internet found"
@@ -278,8 +331,13 @@ setup_hotspot() {
     local ap_if
     if [ -n "$AP_INTERFACE" ]; then
         ap_if="$AP_INTERFACE"
+        # Make sure we're not trying to use the same interface for both
+        if [ "$ap_if" = "$sta_if" ]; then
+            log_error "AP interface '$ap_if' is already used for internet connection"
+            exit 1
+        fi
     else
-        ap_if=$(get_available_ap_interface "$sta_if")
+        ap_if=$(get_available_ap_interface "$sta_if") || true
     fi
 
     if [ -z "$ap_if" ]; then
@@ -288,6 +346,9 @@ setup_hotspot() {
         exit 1
     fi
     log_info "AP interface (hotspot): $ap_if"
+
+    # Clean up any auto-created connections on the AP interface
+    cleanup_ap_interface "$ap_if"
 
     # Check if hotspot already exists and is active
     local existing_hotspot
@@ -308,6 +369,12 @@ setup_hotspot() {
         log_error "Failed to create hotspot"
         exit 1
     fi
+
+    # Configure the Hotspot connection to auto-connect and be bound to this interface
+    log_info "Configuring Hotspot for auto-connect on $ap_if..."
+    nmcli con mod Hotspot connection.autoconnect yes 2>/dev/null || true
+    nmcli con mod Hotspot connection.interface-name "$ap_if" 2>/dev/null || true
+    nmcli con mod Hotspot connection.autoconnect-priority 100 2>/dev/null || true
 
     # Wait for interface to get IP
     sleep 3

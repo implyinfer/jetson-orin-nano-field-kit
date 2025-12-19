@@ -1,0 +1,27 @@
+[Unit]
+Description=Roboflow Web Stream (Vision Experience)
+After=rf-inference.service mediamtx.service network-online.target
+Requires=rf-inference.service
+Wants=mediamtx.service network-online.target
+
+[Service]
+Type=simple
+User=box
+Group=box
+WorkingDirectory=/home/box/jetson-orin-nano-field-kit/apps/vision/roboflow
+
+# Wait for inference server then start web stream
+ExecStartPre=/bin/bash /home/box/jetson-orin-nano-field-kit/system/roboflow/wait-for-inference.sh
+ExecStart=/home/box/jetson-orin-nano-field-kit/apps/vision/roboflow/venv/bin/python run_roboflow_web_stream.py --model rfdetr-small
+
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment="PATH=/home/box/jetson-orin-nano-field-kit/apps/vision/roboflow/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+[Install]
+WantedBy=multi-user.target

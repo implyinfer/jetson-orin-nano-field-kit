@@ -1,0 +1,16 @@
+[Unit]
+Description=Roboflow Inference Server (rf-inference container)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker start rf-inference
+ExecStop=/usr/bin/docker stop rf-inference
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
