@@ -28,7 +28,7 @@ AI-powered vision and voice applications optimized for edge deployment.
 
 This repository contains the application software stack for the Jetson Orin Nano Field Kit, an out of the box configured jetson orin nano developer kit setup. The kit provides dual IMX219 cameras and pre-installed AI tools for offline deployment on top of what's already provided on the jetson orin nano.
 
-This application layer is designed to work with the Jetson Orin Nano system image configured using the setup instructions in the [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes) repository.
+This application layer is designed to work with the Jetson Orin Nano system image.
 
 ## Latest Release (v2 - 2025-12-19)
 
