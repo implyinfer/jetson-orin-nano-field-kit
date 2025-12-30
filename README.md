@@ -7,7 +7,7 @@ AI-powered vision and voice applications optimized for edge deployment.
 
 <p align="center">
 <a href="#overview">About</a> ·
-<a href="https://www.implyinfer.com/jetson-field-kit">How to Purchase</a> ·
+<a href="https://www.implyinfer.com">How to Purchase</a> ·
 <a href="#quick-start">Get Started</a> ·
 <a href="#documentation">Documentation</a> ·
 <a href="#contributing">Contributing</a>
