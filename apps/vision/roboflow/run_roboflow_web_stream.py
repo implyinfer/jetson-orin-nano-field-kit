@@ -27,6 +27,9 @@ import time
 import cv2
 import numpy as np
 
+# Set low-latency FFMPEG options for RTSP capture before any VideoCapture is created
+os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|framedrop;1'
+
 try:
     from inference_sdk import InferenceHTTPClient
     import supervision as sv
@@ -79,11 +82,8 @@ class ThreadedCamera:
     def _capture_loop(self):
         """Background thread that continuously reads frames"""
         while self.running:
-            # Open capture with FFMPEG and TCP transport
-            cap = cv2.VideoCapture(
-                self.rtsp_url + "?rtsp_transport=tcp",
-                cv2.CAP_FFMPEG
-            )
+            # Open capture with FFMPEG backend (low-latency options set via environment variable)
+            cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             if not cap.isOpened():
@@ -724,13 +724,14 @@ class WebStreamInference:
                     cv2.putText(frame, "Waiting for stream...", (160, 240),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
             if not ret:
                 continue
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            time.sleep(0.01)
+            # Minimal sleep to prevent CPU spinning while maintaining low latency
+            time.sleep(0.001)
 
     def inference_loop(self):
         """Main inference loop - reads frames and runs inference"""

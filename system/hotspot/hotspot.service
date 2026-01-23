@@ -14,8 +14,8 @@ ExecStop=/home/box/jetson-orin-nano-field-kit/system/hotspot/setup-hotspot.sh --
 Restart=on-failure
 RestartSec=10
 
-# Wait for WiFi to connect AND USB adapter to be available
-ExecStartPre=/bin/bash -c 'for i in {1..60}; do if nmcli -t -f STATE g 2>/dev/null | grep -q connected && ip link show wlxccbabd28d984 &>/dev/null; then exit 0; fi; sleep 2; done; echo "Timeout waiting for network/adapter"; exit 0'
+# Wait for WiFi to connect AND any USB WiFi adapter to be available
+ExecStartPre=/bin/bash -c 'for i in {1..60}; do if nmcli -t -f STATE g 2>/dev/null | grep -q connected; then for iface in $(ls /sys/class/net/); do driver=$(readlink -f /sys/class/net/$iface/device/driver 2>/dev/null); if [[ "$driver" == *"/usb/"* ]] && iw dev $iface info &>/dev/null; then exit 0; fi; done; fi; sleep 2; done; echo "Timeout waiting for network/USB WiFi adapter"; exit 0'
 
 [Install]
 WantedBy=multi-user.target

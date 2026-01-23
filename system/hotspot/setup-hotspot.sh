@@ -101,6 +101,20 @@ get_wifi_interfaces() {
     iw dev 2>/dev/null | grep "Interface" | awk '{print $2}'
 }
 
+# Get USB WiFi interfaces (for hotspot AP mode)
+# USB WiFi adapters are identified by their driver path containing "usb"
+get_usb_wifi_interface() {
+    for iface in $(get_wifi_interfaces); do
+        local driver_path
+        driver_path=$(readlink -f "/sys/class/net/$iface/device/driver" 2>/dev/null) || continue
+        if [[ "$driver_path" == *"/usb/"* ]]; then
+            echo "$iface"
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Get the WiFi interface currently connected to a network (STA mode)
 get_sta_interface() {
     nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | \
@@ -179,7 +193,13 @@ stop_hotspot() {
     # Remove iptables rules for hotspot subnet
     log_info "Cleaning up iptables rules..."
     iptables -t nat -D POSTROUTING -s 10.42.0.0/24 -j MASQUERADE 2>/dev/null || true
-    iptables -D FORWARD -i wlxccbabd28d984 -j ACCEPT 2>/dev/null || true
+
+    # Clean up forward rules for any USB WiFi interface
+    local usb_wifi
+    usb_wifi=$(get_usb_wifi_interface) || true
+    if [ -n "$usb_wifi" ]; then
+        iptables -D FORWARD -i "$usb_wifi" -j ACCEPT 2>/dev/null || true
+    fi
     iptables -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
 
     # Clean up any rules mentioning 10.42.0.0
@@ -316,16 +336,16 @@ setup_hotspot() {
         log_info "Using configured AP interface: $AP_INTERFACE"
     fi
 
-    # Find STA interface (connected to internet)
+    # Find STA interface (connected to internet) - optional
     local sta_if
     sta_if=$(get_sta_interface) || true
 
     if [ -z "$sta_if" ]; then
-        log_error "No WiFi interface connected to internet found"
-        log_error "Please connect to a WiFi network first"
-        exit 1
+        log_warn "No WiFi interface connected to internet found"
+        log_warn "Hotspot will run without internet sharing (local access only)"
+    else
+        log_info "STA interface (internet): $sta_if"
     fi
-    log_info "STA interface (internet): $sta_if"
 
     # Find or use specified AP interface
     local ap_if
@@ -337,12 +357,16 @@ setup_hotspot() {
             exit 1
         fi
     else
-        ap_if=$(get_available_ap_interface "$sta_if") || true
+        # Auto-detect USB WiFi adapter for AP mode (only USB adapters allowed)
+        ap_if=$(get_usb_wifi_interface) || true
+        if [ -n "$ap_if" ]; then
+            log_info "Auto-detected USB WiFi adapter: $ap_if"
+        fi
     fi
 
     if [ -z "$ap_if" ]; then
-        log_error "No available WiFi interface for AP mode"
-        log_error "Please connect a second WiFi adapter"
+        log_error "No USB WiFi adapter found for AP mode"
+        log_error "Please connect a USB WiFi adapter"
         exit 1
     fi
     log_info "AP interface (hotspot): $ap_if"
@@ -387,8 +411,13 @@ setup_hotspot() {
     fi
     log_info "Hotspot subnet: $subnet"
 
-    # Setup NAT and forwarding
-    setup_nat "$ap_if" "$sta_if" "$subnet"
+    # Setup NAT and forwarding only if internet connection is available
+    if [ -n "$sta_if" ]; then
+        setup_nat "$ap_if" "$sta_if" "$subnet"
+    else
+        log_warn "Skipping NAT setup - no internet connection available"
+        log_info "Hotspot is running in local-only mode"
+    fi
 
     # Restart avahi for clean mDNS
     restart_avahi

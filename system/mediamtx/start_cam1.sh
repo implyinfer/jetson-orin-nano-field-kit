@@ -17,8 +17,8 @@ gst-launch-1.0 -e \
   queue max-size-buffers=1 max-size-time=0 max-size-bytes=0 leaky=upstream ! \
   x264enc \
     tune=zerolatency \
-    speed-preset=ultrafast \
-    bitrate=3000 \
+    speed-preset=faster \
+    bitrate=8000 \
     key-int-max=30 \
     bframes=0 \
     sliced-threads=true \
