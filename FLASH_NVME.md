@@ -25,7 +25,7 @@ The releases page contains the most up-to-date system images. Always use the lat
 
 **Note:** The example URL below is for reference only and may not be the latest version:
 ```
-https://r2.implyinfer.com/release-images/checkpoint_3.img.zst
+https://r2.implyinfer.com/release-images/jetson_backup_95gb_2025-12-19.img.zst
 ```
 
 **Always check the [releases page](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases) for the latest release image.**
@@ -76,7 +76,7 @@ Download the latest release image (`.img.zst` file) from the releases:
 
 ```bash
 # Example (replace with latest release URL)
-wget https://r2.implyinfer.com/release-images/checkpoint_3.img.zst
+wget https://r2.implyinfer.com/release-images/[IMAGE_NAME].img.zst
 ```
 
 #### Decompress the Image
@@ -88,8 +88,8 @@ The image is compressed using `zstd`. Decompress it:
 sudo apt-get update
 sudo apt-get install -y zstd
 
-# Decompress the image
-zstd -d checkpoint_3.img.zst -o jetson_min.img
+# Decompress the image (replace [IMAGE_NAME] with your file)
+zstd -d [IMAGE_NAME].img.zst -o jetson_min.img
 ```
 
 **Note:** This will take several minutes as it decompresses ~15GB to ~50GB.
@@ -117,7 +117,7 @@ sudo dd if=jetson_min.img of=/dev/sda bs=64M status=progress oflag=direct
 sync
 ```
 
-**This step will take 10-30 minutes depending on your system and SSD speed.**
+**This step will take 1-30 minutes depending on your system, cable bandwidth, and SSD speed.**
 
 The `status=progress` flag shows transfer progress, and `oflag=direct` ensures direct I/O for better performance.
 
@@ -161,7 +161,7 @@ Inside the `parted` interactive shell:
 (parted) quit
 ```
 
-This updates the GPT partition entry so partition 1 spans the entire drive (instead of ~50GB).
+This updates the GPT partition entry so partition 1 spans the entire drive.
 
 ### 8. Expand the Filesystem
 
@@ -182,7 +182,7 @@ sudo resize2fs /dev/sda1
 Verify that the filesystem now uses the full capacity:
 
 ```bash
-df -h /dev/sda1
+lsblk
 ```
 
 You should see output like:
@@ -191,7 +191,7 @@ Filesystem      Size  Used  Avail  Use%  Mounted on
 /dev/sda1       470G   XG    YG     Z%   /mnt
 ```
 
-The size should now be approximately **470GB** or near the full size of the nvme drive (accounting for filesystem overhead), indicating the expansion was successful.
+If the size now appears close to your NVMe drive's full capacity (allowing for filesystem overhead), the expansion was successful. If the new size isn't shown yet, try running `sync` to flush writes, and re-run `lsblk`. If it still displays the old size, reboot your Linux system and check again, or check with `df -h` and `lsblk` to confirm. Occasionally, a system rescan or a restart is required before the correct size is recognized.
 
 ### 10. Safely Remove and Install
 

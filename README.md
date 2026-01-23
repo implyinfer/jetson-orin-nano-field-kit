@@ -1,36 +1,92 @@
 <h1 align="center"><strong>Jetson Orin Nano Field Kit</strong></h1>
 
 <p align="center">
-Open source application layer for the Jetson Orin Nano Field Kit.<br>
-AI-powered vision and voice applications optimized for edge deployment.
+  Optimized, ready-to-boot prototyping stack for the Jetson Orin Nano to save many hours of setup<br>
 </p>
 
 <p align="center">
-<a href="#overview">About</a> ·
-<a href="https://www.implyinfer.com/jetson-field-kit">How to Purchase</a> ·
-<a href="#quick-start">Get Started</a> ·
-<a href="#documentation">Documentation</a> ·
-<a href="#contributing">Contributing</a>
+  <img src="images/IMG_9174-web-1920.jpg" width="45%" />
+  <img src="images/field_kit_tagged.png" width="45%" />
 </p>
 
+<p align="center">
+  <a href="#getting-started">Get Started</a> ·
+  <a href="https://shop.implyinfer.com">How to Purchase</a> ·
+  <a href="https://implyinfer.com/docs">Documentation</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+## TL;DR
+
+<div align="center">
+
+| **Production-Ready Hardware** | **Optimized Software Stack** |
+| :--- | :--- |
+| ✅ **Dual Stereo IMX219** (160° FOV) |  **Built on JetPack 6.2.1** |
+| ✅ **Bootable NVMe SSD** (Pre-flashed) | **10+ vision, language, and speech models preinstalled** |
+| ✅ **AC600 WiFi** (AP + Station Mode) |  **Low-Latency MediaMTX Streaming** |
+| ✅ **Custom Case** (Rigid Camera Mount) |  **PyTorch, TensorRT, OpenCV, CTranslate2, Llamacpp, Whisper Pre-built for Cuda 12.6** |
+
+[**Download Latest OS Image**](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases/latest)
+
+<br/>
+<br/>
+
+<p><strong>Official Community Hardware Partner</strong></p>
+<img src="images/roboflow.svg" height="40" />
+<p><strong>Free Annual Core Plan</strong> ($900 Value) with every Field Kit purchase.<br>
+<em>Available until Jan 31st, 2026</em></p>
+<img src="images/roboflow_inference_demo.png" width="80%" />
+
+</div>
 ---
 
 <p align="center">
-  <img src="images/gemini_context_1.jpg" width="45%" />
-  <img src="images/IMG_9174-web-1920.jpg" width="45%" />
+  <img src="images/launch_video_cover_photo_youtube.jpg" width="80%" />
 </p>
 <p align="center">
-  <img src="images/field-kit-purple-front.jpg" width="45%" />
-  <img src="images/field-kit-purple-back.jpg" width="45%" />
+  <img src="images/gemini_context_1.jpg" width="30%" />
+  <img src="images/field-kit-purple-front.jpg" width="30%" />
+  <img src="images/field-kit-purple-back.jpg" width="30%" />
 </p>
 
 ## Overview
 
+Building computer vision, LLMs, voice apps, etc on the Jetson Orin Nano is incredible, but getting it configured and production-ready can be a nightmare. 
+
+To stop repeating this process for every experiment, I built a custom OS image and hardware setup. It saved me and friends weeks of dev time, so I decided to polish it up and open source it.
+
+From loading an OS image onto a microSD (or M.2 NVMe ssd), getting everything configured, getting the device tree to play nice with specific cameras, making it boot reliably from an NVMe SSD (so it’s actually fast), and compiling what felt like endless libraries just to use CUDA 12.6 properly. Plus all the troubleshooting along the way takes hundreds of hours.
+
 This repository contains the application software stack for the Jetson Orin Nano Field Kit, an out of the box configured jetson orin nano developer kit setup. The kit provides dual IMX219 cameras and pre-installed AI tools for offline deployment on top of what's already provided on the jetson orin nano.
 
-This application layer is designed to work with the Jetson Orin Nano system image configured using the setup instructions in the [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes) repository.
+**[Read the Full Documentation at implyinfer.com/docs](https://implyinfer.com/docs)**
 
-## Latest Release (v2 - 2025-12-19)
+### Hardware in the Kit
+-   ✅ **Jetson Orin Nano Super**: The powerful edge AI compute module.
+-   ✅ **Dual Stereo IMX219 Cameras**: 160° FOV, pre-configured for depth/SLAM.
+-   ✅ **256GB NVMe SSD**: Bootable, fast I/O, pre-flashed with our custom image.
+-   ✅ **AC600 USB Wifi**: Supports simultaneous AP + Station modes (Hotspot + Internet).
+-   ✅ **Custom Case**: Protects the board and holds cameras rigid for stable calibration.
+
+### Software Stack
+It runs a fully open source custom **JetPack 6.2.1** image that is maintained and updated frequently.
+
+-   **Ready to Run**: Docker, Livekit, Ollama, Llama.cpp, Roboflow Inference Server, 10+ vision/language models pre-installed.
+-   **Optimized for CUDA 12.6**: Pre-compiled TensorRT, PyTorch, OpenCV (with GStreamer/V4L2 support), CTranslate, Cusparselt, etc.
+-   **Connectivity**: Configured for low-latency MediaMTX camera streams and AP + STA WiFi mode.
+
+## Zero to Hero Guide
+
+Watch this video for a visual walkthrough of the first boot process and getting started with your Field Kit:
+
+- **Zero to Hero Guide (Docs)**: https://www.implyinfer.com/docs/zero-to-hero
+- **Zero to Hero Video**: https://youtu.be/H8-wf09d_XQ
+- **Launch Video**: https://youtu.be/rB8F3yZPCGM
+
+[![Zero to Hero Bootup Video](https://img.youtube.com/vi/H8-wf09d_XQ/0.jpg)](https://youtu.be/H8-wf09d_XQ)
+
+## Latest Release (v2.1 - 2025-12-19)
 
 The latest system image is included in all Jetson Orin Nano Field Kits. It provides a complete out-of-the-box experience with all services pre-installed and configured.
 
@@ -38,248 +94,155 @@ The latest system image is included in all Jetson Orin Nano Field Kits. It provi
 - **Flashing Guide**: [NVMe Flashing Guide](https://github.com/implyinfer/jetson-orin-nano-field-kit/blob/release-v1/FLASH_NVME.md)
 
 ### Release Highlights
+- **First Boot Demo**: Instant vision system demo on port 5000 (`http://box.local` or `http://localhost:5000`).
+- **Roboflow Inference Server**: GPU-accelerated object detection with offline model caching.
+- **MediaMTX Streaming**: Ultra low-latency RTSP/RTMP camera streaming.
+- **Large Language Models**: Open WebUI with Ollama and pre-loaded models (`qwen3:1.7b`, `ministral-3:3b`).
+- **WiFi Hotspot**: Creates `JetsonFieldKit` AP for easy configuration.
 
-- **First Boot Demo**: Instant vision system demo on port 5000 (`http://box.local` or `http://localhost:5000`), showing `rfdetr-small` running live object detection immediately after boot.
-- **Roboflow Inference Server**: Hardened Docker container with GPU acceleration (TensorRT/CUDA) and offline model caching. API on port 9001.
-- **MediaMTX Streaming**: Pre-configured systemd service for RTSP/RTMP camera streaming.
-- **Large Language Models**: Open WebUI with Ollama runtime and pre-loaded models (`qwen3:1.7b`, `ministral-3:3b`) optimized for Orin Nano.
-- **Development Tools**: Claude Code Editor installed for on-device development.
-- **Connectivity**: Firefox browser (Snap) and USB WiFi adapter support (8821cu) for flexible networking.
-- **System Services**:
-  - **Roboflow Vision Service**: Auto-starts inference server and web stream.
-  - **WiFi Hotspot Service**: Creates `JetsonFieldKit` AP for easy configuration.
+## Self Setup (DIY Guide)
 
-## Features
+You can build your own Field Kit using the open source software and hardware designs.
 
-- **Dual Camera RTSP/WebRTC Streaming** - Ultra low-latency video streaming via MediaMTX
-- **Roboflow Local Inference** - GPU-accelerated object detection with pre-downloaded models and 9-DOF IMU integration
-- **WiFi Hotspot (AP+STA)** - Automatically creates a "JetsonFieldKit" hotspot while maintaining internet connection
-- **Web-based Monitoring** - Browser-accessible video streams with real-time inference overlays and sensor data
-- **Voice Assistant** - Wake word-enabled assistant with tool calling and offline knowledge base
+### 1. Hardware Requirements
+- **Jetson Orin Nano Developer Kit** (8GB RAM recommended)
+- **NVMe SSD** (256GB+ required, 512GB+ recommended)
+- **Dual IMX219 Cameras** (e.g., Arducam 8MP Stereo HAT or 2x Raspberry Pi Camera V2)
+- **USB WiFi Adapter** (RTL8811AU/RTL8821AU chipset for AP mode support, e.g. BrosTrend AC600)
 
-## Quick Start
+### 2. Download & Flash OS Image
+1.  **Download the latest image**: [Releases](https://github.com/implyinfer/jetson-orin-nano-field-kit/releases/latest)
+2.  **Flash to NVMe**: Follow the **[NVMe Flashing Guide](FLASH_NVME.md)**.
+    > ⚠️ **Note**: The system must be booted from NVMe. MicroSD cards are too slow for these AI workloads.
 
-### 1. Provision System Services
+### 3. 3D Print the Case
+We provide the STL files for the custom rugged case and rigid camera mount.
+- **[Download STL Files](https://github.com/implyinfer/jetson-orin-nano-field-kit/tree/main/hardware/case)** (Placeholder link)
+- **Recommended Material**: PETG or ABS for heat resistance.
+- **Assembly Guide**: [Assembly Instructions](https://implyinfer.com/docs/assembly) (Placeholder link)
 
-The kit comes with a provisioning script that sets up all necessary systemd services (MediaMTX, Roboflow, Kiwix, Hotspot, etc.).
+### 4. Camera Setup
+The image is pre-configured for dual IMX219 cameras.
+1.  Connect cameras to CSI ports (Cam 0 = Left, Cam 1 = Right).
+2.  Boot the system.
+3.  Verify streams at `http://box.local:8888/cam0` and `http://box.local:8888/cam1`.
 
+### Managing Services (Custom Hardware)
+If you are using different hardware (different WiFi adapter, no cameras, etc.), you can disable specific services to save resources:
+
+#### WiFi Hotspot
+If you don't have the specific AC600 adapter, disable the hotspot service:
 ```bash
-cd system
-sudo bash provision.sh
+sudo systemctl disable --now hotspot.service
 ```
 
-This will install and start:
-- **MediaMTX** (Streaming Server)
-- **Roboflow Inference Server** & **Web Stream**
-- **WiFi Hotspot**
-- **Kiwix** (Offline Wiki)
-- **Open WebUI** (Ollama Frontend)
+#### Camera Streaming
+If you don't have cameras connected, disable the streaming service:
+```bash
+sudo systemctl disable --now mediamtx.service
+```
 
-### 2. Connect to WiFi Hotspot
+#### Other Optional Services
+To free up resources, you can disable other pre-installed services:
+- **Offline Wikipedia:** `sudo systemctl disable --now kiwix.service`
+- **Voice Assistant:** `sudo systemctl disable --now livekit.service`
+- **Roboflow Inference:** `sudo systemctl disable --now roboflow.service`
 
+## Getting Started
+
+### 1. First Boot & Connection
 The system automatically creates a WiFi hotspot for easy access:
 
-- **SSID**: `JetsonFieldKit`
-- **Password**: `fieldkit123`
-- **Gateway IP**: `10.42.0.1`
+1.  **Connect to WiFi**: Look for the network **`JetsonFieldKit`**
+    -   **Password**: `fieldkit123`
+2.  **Access the Device**:
+    -   **Hostname**: `http://box.local`
+    -   **Hotspot IP**: `http://10.42.0.1`
+    -   **LAN IP**: `http://<192.168.x.x>` (if connected to Ethernet)
 
-You can access the device using:
-- **Hostname**: `http://box.local` (Mac/Windows/Linux with mDNS)
-- **Hotspot IP**: `http://10.42.0.1`
-- **LAN IP**: `http://<192.168.x.x>` (if connected to another WiFi network)
+### 2. Default Credentials
 
-### 3. Access Web Interface
+| Service | Username | Password |
+|---------|----------|----------|
+| **System User** | `box` | `box` |
+| **WiFi Hotspot** | SSID: `JetsonFieldKit` | `fieldkit123` |
 
-Open your browser to:
+> **Security Note**: Change the default system password immediately after first login using the `passwd` command.
 
-- **Roboflow Stream**: `http://box.local/` or `http://10.42.0.1/` (Real-time inference visualization)
-- **Open WebUI**: `http://box.local/webui/` or `http://10.42.0.1/webui/` (LLM Chat)
-- **Kiwix**: `http://box.local:8001` or `http://10.42.0.1:8001` (Offline Knowledge Base)
+## Features & Guides
 
-## Architecture
+Once connected, you can explore the various capabilities of the Field Kit. Check out our [full documentation](https://implyinfer.com/docs) for detailed guides.
 
-This is a monorepo built with Turborepo, containing multiple applications and shared packages:
+### 👁️ Computer Vision
+Real-time object detection using Roboflow inference and IMU sensor data.
+- **[Read the Guide](https://implyinfer.com/docs/computer-vision-with-roboflow)**
+- **Demo**: `http://box.local`
 
-### Applications
+### 🧠 Large Language Models
+Run LLMs locally without cloud dependencies. Includes Open WebUI.
+- **[Read the Guide](https://implyinfer.com/docs/llms)**
+- **Access**: `http://box.local/webui/`
 
-- **Vision** (`apps/vision/roboflow`) - Real-time object detection using Roboflow inference and IMU sensor data
-- **Voice Assistant** (`apps/voice-assistant`) - Wake word-enabled voice assistant with tool calling, Linux command execution, and offline knowledge base integration
-- **Docs** (`apps/docs`) - Documentation site built with Next.js
+### 🗣️ Voice Assistant
+Wake word-enabled voice assistant with tool calling and offline capabilities.
+- **[Read the Guide](https://implyinfer.com/docs/voice-assistant)**
 
-### System Services
+## System Reference
 
-System-level services configured for the Jetson Orin Nano:
-
-- **Hotspot** (`system/hotspot`) - AP+STA WiFi hotspot configuration
-- **MediaMTX** (`system/mediamtx`) - RTSP streaming server for IMX219 camera modules
-- **Nginx** (`system/nginx`) - Reverse proxy for web services
-- **LiveKit** (`system/livekit`) - Real-time communication infrastructure for voice assistant
-- **Kiwix** (`system/kiwix`) - Offline Wikipedia and knowledge base server
-- **Roboflow** (`system/roboflow`) - Docker service for Roboflow inference server and web stream
-- **Ultralytics** (`system/ultralytics`) - YOLO model inference service
-
-### Shared Packages
-
-- `packages/ui` - Shared UI components
-- `packages/eslint-config` - Shared ESLint configurations
-- `packages/typescript-config` - Shared TypeScript configurations
-
-## Camera Streaming (MediaMTX)
-
-The system uses MediaMTX for reliable, low-latency camera streaming with three protocols:
-
-- **RTSP** (port 8554) - Best for programmatic access and VLC
-- **HLS** (port 8888) - Works in any web browser
-- **WebRTC** (port 8889) - Ultra low-latency web viewing
-
-### Stream Configuration
-
-Camera streams are configured in `system/mediamtx/mediamtx.yml` with optimized scripts:
-- `system/mediamtx/start_cam0.sh` - Left stereo camera (sensor-id=0)
-- `system/mediamtx/start_cam1.sh` - Right stereo camera (sensor-id=1)
-
-Both stereo cameras stream at **1280x720 @ 30fps** with ultra low-latency encoding optimizations.
-
-### Viewing Streams
-
-**VLC Player:**
-```bash
-vlc rtsp://<JETSON_IP>:8554/cam0
-```
-
-**Web Browser:**
-Open `http://<JETSON_IP>:8888/cam0` or `http://<JETSON_IP>:8889/cam0`
-
-For detailed setup instructions, see [RTSP_SETUP.md](RTSP_SETUP.md).
-
-## Roboflow Inference & Vision
-
-The kit includes GPU-accelerated object detection using Roboflow's inference server with locally cached models, integrated with a 9-DOF IMU (ICM20948) for orientation tracking.
-
-### Web Stream with IMU
-
-The system runs a web stream service (`roboflow-web-stream.service`) that provides:
-1. Real-time video stream from the camera
-2. Object detection bounding boxes and labels
-3. 3D visualization of the device orientation using IMU data
-
-Access it at `http://<JETSON_IP>/`.
-
-### Download Models (One-time Setup)
-
-Pre-download models for offline inference:
-
-```bash
-cd apps/vision/roboflow
-source venv/bin/activate
-python download_models.py
-```
-
-**Available Models:**
-
-| Model | Description |
-|-------|-------------|
-| `yolov11n-640` | YOLOv11 Nano - Fast, lightweight |
-| `rfdetr-small` | RF-DETR Small - High accuracy |
-| `yolov8n-640` | YOLOv8 Nano - Fast |
-
-## Installation
-
-### System Image Setup
-
-Before using this application layer, ensure you have:
-
-1. **Downloaded the latest release image** (see [Latest Release](#latest-release-v2---2025-12-19) section above)
-2. **Flashed the Jetson Orin Nano with the system image** - See [NVMe Flashing Guide](https://github.com/implyinfer/jetson-orin-nano-field-kit/blob/release-v1/FLASH_NVME.md) for complete instructions on flashing the image to an NVMe SSD
-3. Completed the initial setup using instructions from [implyinfer-jetson-orin-nano-field-kit-notes](https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit-notes)
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/implyinfer/implyinfer-jetson-orin-nano-field-kit.git
-cd implyinfer-jetson-orin-nano-field-kit
-```
-
-### 2. Install Dependencies
-
-```bash
-# Install pnpm if not already installed
-npm install -g pnpm@9.0.0
-
-# Install project dependencies
-pnpm install
-```
-
-### 3. Provision Services
-
-```bash
-# Provision all system services
-cd system
-sudo bash provision.sh
-```
-
-This will set up all services including MediaMTX, Roboflow, Kiwix, and the WiFi Hotspot.
-
-## Service Ports Summary
+### Service Ports
 
 | Port | Service | Description |
 |------|---------|-------------|
-| 80 | Nginx | Main Web Interface (Roboflow Stream + WebUI) |
-| 5000 | Roboflow Web Stream | Internal Stream Port (Proxied to 80) |
-| 8001 | Kiwix | Offline Wikipedia |
-| 8554 | MediaMTX RTSP | Camera RTSP streams |
-| 8888 | MediaMTX HLS | Camera HLS streams |
-| 8889 | MediaMTX WebRTC | Camera WebRTC streams |
-| 9001 | Roboflow Inference | GPU inference API |
-| 3000 | Open WebUI | LLM Chat (Proxied to 80/webui) |
+| **80** | Nginx | Main Web Interface (Roboflow Stream + WebUI) |
+| **5000** | Roboflow Stream | Internal Stream Port (Proxied to 80) |
+| **8001** | Kiwix | Offline Wikipedia |
+| **8554** | MediaMTX RTSP | Camera RTSP streams |
+| **8888** | MediaMTX HLS | Camera HLS streams |
+| **8889** | MediaMTX WebRTC | Camera WebRTC streams |
+| **9001** | Inference API | GPU inference API |
+| **3000** | Open WebUI | LLM Chat (Proxied to 80/webui) |
+
+### Camera Streaming
+Streams are available via MediaMTX:
+- **RTSP**: `rtsp://<IP>:8554/cam0` (Left) & `rtsp://<IP>:8554/cam1` (Right)
+- **Web Browser**: `http://<IP>:8888/cam0`
 
 ## Development
 
-### Monorepo Commands
+This is a monorepo built with Turborepo.
+
+### Installation
 
 ```bash
-# Run all builds
-pnpm build
+# Clone the repository
+git clone https://github.com/implyinfer/jetson-orin-nano-field-kit.git
+cd jetson-orin-nano-field-kit
 
-# Run all linters
-pnpm lint
+# Install dependencies
+npm install -g pnpm@9.0.0
+pnpm install
 
-# Run type checking
-pnpm check-types
-
-# Format code
-pnpm format
+# Provision services (on Jetson)
+cd system
+sudo bash provision.sh
 ```
 
-### Code Style
+### Build Commands
 
-- JavaScript/TypeScript: Follows Standard.js rules (2 spaces, no semicolons, single quotes)
-- Python: Follows PEP 8 conventions
-- Use functional and declarative programming patterns
-- Prefer composition over inheritance
-
-## Requirements
-
-- NVIDIA Jetson Orin Nano Developer Kit
-- JetPack 6.2
-- Dual Stereo IMX219 camera module
-- Docker and Docker Compose
-- WiFi Adapter (for Hotspot AP mode)
-
-## Documentation
-
-- [NVMe Flashing Guide](FLASH_NVME.md) - Complete instructions for flashing the system image to an NVMe SSD
-- [RTSP Setup Guide](RTSP_SETUP.md) - Complete RTSP streaming setup
+```bash
+pnpm build        # Run all builds
+pnpm lint         # Run all linters
+pnpm check-types  # Run type checking
+pnpm format       # Format code
+```
 
 ## Contributing
 
-This is an open source project. Contributions are welcome. Please:
-
+Contributions are welcome!
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes following the code style guidelines
-4. Submit a pull request
+3. Submit a pull request
 
 ## License
 
-See LICENSE file for license information.
+See [LICENSE](LICENSE) file for license information.
