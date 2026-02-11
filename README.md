@@ -117,15 +117,13 @@ You can build your own Field Kit using the open source software and hardware des
 
 ### 3. 3D Print the Case
 We provide the STL files for the custom rugged case and rigid camera mount.
-- **[Download STL Files](https://github.com/implyinfer/jetson-orin-nano-field-kit/tree/main/hardware/case)** (Placeholder link)
-- **Recommended Material**: PETG or ABS for heat resistance.
-- **Assembly Guide**: [Assembly Instructions](https://implyinfer.com/docs/assembly) (Placeholder link)
+- **[Download STL Files](https://www.printables.com/model/1558673-jetson-orin-nano-field-kit-by-implyinfer)** 
 
 ### 4. Camera Setup
 The image is pre-configured for dual IMX219 cameras.
 1.  Connect cameras to CSI ports (Cam 0 = Left, Cam 1 = Right).
 2.  Boot the system.
-3.  Verify streams at `http://box.local:8888/cam0` and `http://box.local:8888/cam1`.
+3.  Verify webrtc streams at `http://box.local:8889/cam0` and `http://box.local:8889/cam1`.
 
 ### Managing Services (Custom Hardware)
 If you are using different hardware (different WiFi adapter, no cameras, etc.), you can disable specific services to save resources:
