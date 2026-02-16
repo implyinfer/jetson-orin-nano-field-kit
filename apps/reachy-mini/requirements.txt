@@ -1,0 +1,36 @@
+# Reachy Mini Control App Requirements
+#
+# RECOMMENDED: Use uv package manager (as per official Reachy Mini docs)
+#   curl -LsSf https://astral.sh/uv/install.sh | sh
+#   uv venv venv --python 3.12
+#   source venv/bin/activate
+#   uv pip install -r requirements.txt
+#
+# Alternative: pip install -r requirements.txt
+
+# Reachy Mini SDK
+# Official docs: https://huggingface.co/docs/reachy_mini/SDK/installation
+reachy-mini>=1.2.0
+
+# Web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+jinja2>=3.1.0
+aiofiles>=23.0.0
+python-multipart>=0.0.6
+
+# WebRTC streaming
+aiortc>=1.6.0
+av>=10.0.0
+
+# Computer vision
+opencv-contrib-python>=4.8.0
+numpy>=1.21.2
+
+# Configuration
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# HTTP client (for people tracker integration with Roboflow)
+requests>=2.31.0

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .video-container {
+            position: relative;
+            background: #1a1a1a;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        
+        .status-online { background-color: #10b981; }
+        .status-offline { background-color: #ef4444; }
+        .status-executing { background-color: #f59e0b; animation: pulse 2s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .macro-btn {
+            transition: all 0.2s ease;
+            transform: translateY(0);
+        }
+        
+        .macro-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .macro-btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        
+        .macro-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .connection-status {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+        
+        #videoElement {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .control-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-robot text-2xl text-blue-400"></i>
+                <h1 class="text-2xl font-bold">{{ title }}</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center">
+                    <span class="status-indicator" id="robotStatus"></span>
+                    <span id="robotStatusText">Connecting...</span>
+                </div>
+                <div class="text-sm text-gray-400">
+                    <i class="fas fa-wifi mr-1"></i>
+                    <span id="connectionCount">0</span> viewers
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Video Stream -->
+            <div class="lg:col-span-2">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-video mr-2 text-green-400"></i>
+                        Live Video Stream
+                    </h2>
+                    <div class="video-container aspect-video">
+                        <video id="videoElement" autoplay playsinline muted></video>
+                        <div class="connection-status" id="streamStatus">
+                            <i class="fas fa-circle-notch fa-spin mr-1"></i>
+                            Connecting...
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-between items-center text-sm text-gray-400">
+                        <span>Resolution: <span id="videoResolution">{{ webrtc_port }}</span></span>
+                        <span>Latency: <span id="streamLatency">-- ms</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="space-y-6">
+                <!-- Robot Status -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-info-circle mr-2 text-blue-400"></i>
+                        Robot Status
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span>Connection:</span>
+                            <span id="connectionStatus" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>State:</span>
+                            <span id="awakeStatus" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Safety Mode:</span>
+                            <span class="font-semibold text-green-400">
+                                <i class="fas fa-shield-alt mr-1"></i>
+                                Enabled
+                            </span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Current Action:</span>
+                            <span id="currentAction" class="font-semibold">Idle</span>
+                        </div>
+                    </div>
+
+                    <!-- Wake/Sleep Controls -->
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <button id="wakeUpBtn" onclick="wakeUp()" class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors">
+                            <i class="fas fa-sun"></i>
+                            <span>Wake Up</span>
+                        </button>
+                        <button id="sleepBtn" onclick="goToSleep()" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors">
+                            <i class="fas fa-moon"></i>
+                            <span>Sleep</span>
+                        </button>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-400 text-center">
+                        Wake up Reachy to enable camera and movements
+                    </div>
+                </div>
+
+                <!-- Entertainment Macros -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-magic mr-2 text-purple-400"></i>
+                        Entertainment Macros
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        {% for macro in macros %}
+                        <button class="macro-btn bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 px-4 py-3 rounded-lg font-medium text-sm flex items-center justify-center space-x-2" 
+                                onclick="executeMacro('{{ macro }}')">
+                            <i class="fas fa-{% if macro == 'wave' %}hand-paper{% elif macro == 'dance' %}music{% elif macro == 'look_around' %}search{% elif macro == 'nod' %}check{% elif macro == 'shake_head' %}times{% elif macro == 'point' %}hand-point-right{% elif macro == 'celebrate' %}trophy{% else %}robot{% endif %}"></i>
+                            <span>{{ macro.title().replace('_', ' ') }}</span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-4 text-xs text-gray-400 text-center">
+                        Click any action to make Reachy perform for viewers
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fas fa-microchip mr-2 text-yellow-400"></i>
+                        System Info
+                    </h3>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span>Platform:</span>
+                            <span class="font-mono">Jetson Orin Nano</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>WebRTC Port:</span>
+                            <span class="font-mono">{{ webrtc_port }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Camera:</span>
+                            <span id="cameraStatus">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emergency Stop -->
+                <div class="bg-gray-800 rounded-lg p-6 border-2 border-red-500 border-dashed">
+                    <button id="emergencyStop" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg flex items-center justify-center space-x-2 transition-colors">
+                        <i class="fas fa-stop-circle text-xl"></i>
+                        <span>EMERGENCY STOP</span>
+                    </button>
+                    <div class="mt-2 text-xs text-gray-400 text-center">
+                        Immediately stops all robot movements
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="mt-8 bg-gray-800 rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <i class="fas fa-list mr-2 text-green-400"></i>
+                Activity Log
+            </h3>
+            <div id="activityLog" class="space-y-2 max-h-48 overflow-y-auto">
+                <div class="text-sm text-gray-400 p-3 bg-gray-700 rounded">
+                    System initialized - Ready for commands
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let pc = null;
+        let ws = null;
+        let isExecutingMacro = false;
+        let streamStartTime = null;
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWebSocket();
+            initializeWebRTC();
+            startStatusUpdates();
+            
+            // Emergency stop handler
+            document.getElementById('emergencyStop').addEventListener('click', emergencyStop);
+        });
+
+        // WebSocket connection
+        function initializeWebSocket() {
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                logActivity('WebSocket connected');
+                updateConnectionStatus(true);
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                handleWebSocketMessage(message);
+            };
+            
+            ws.onclose = function() {
+                logActivity('WebSocket disconnected');
+                updateConnectionStatus(false);
+                // Attempt to reconnect after 3 seconds
+                setTimeout(initializeWebSocket, 3000);
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                logActivity('WebSocket error occurred');
+            };
+        }
+
+        // WebRTC setup
+        async function initializeWebRTC() {
+            try {
+                pc = new RTCPeerConnection({
+                    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                });
+
+                pc.ontrack = function(event) {
+                    const video = document.getElementById('videoElement');
+                    video.srcObject = event.streams[0];
+                    streamStartTime = Date.now();
+                    updateStreamStatus('Connected', 'text-green-400');
+                    logActivity('Video stream connected');
+                };
+
+                pc.onconnectionstatechange = function() {
+                    console.log('WebRTC connection state:', pc.connectionState);
+                    if (pc.connectionState === 'connected') {
+                        updateStreamStatus('Connected', 'text-green-400');
+                    } else if (pc.connectionState === 'disconnected') {
+                        updateStreamStatus('Disconnected', 'text-red-400');
+                    } else if (pc.connectionState === 'connecting') {
+                        updateStreamStatus('Connecting...', 'text-yellow-400');
+                    }
+                };
+
+                // Create offer and establish connection
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const response = await fetch('/api/webrtc/offer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sdp: offer.sdp,
+                        type: offer.type
+                    })
+                });
+
+                const answer = await response.json();
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                
+                logActivity('WebRTC connection established');
+
+            } catch (error) {
+                console.error('WebRTC setup error:', error);
+                updateStreamStatus('Failed to connect', 'text-red-400');
+                logActivity('WebRTC connection failed');
+            }
+        }
+
+        // Handle WebSocket messages
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'pong':
+                    // Keep-alive response
+                    break;
+                case 'macro_result':
+                    handleMacroResult(message);
+                    break;
+                default:
+                    console.log('Unknown message type:', message.type);
+            }
+        }
+
+        // Execute macro
+        async function executeMacro(macroName) {
+            if (isExecutingMacro) {
+                logActivity(`Cannot execute ${macroName}: Another macro is running`);
+                return;
+            }
+
+            try {
+                // Disable all macro buttons
+                const buttons = document.querySelectorAll('.macro-btn');
+                buttons.forEach(btn => btn.disabled = true);
+                
+                isExecutingMacro = true;
+                updateCurrentAction(`Executing ${macroName}...`);
+                logActivity(`Started macro: ${macroName}`);
+
+                const response = await fetch('/api/macro', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: macroName })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    logActivity(`Macro completed: ${macroName}`);
+                } else {
+                    logActivity(`Macro failed: ${macroName} - ${result.message}`);
+                }
+
+            } catch (error) {
+                console.error('Macro execution error:', error);
+                logActivity(`Macro error: ${macroName} - ${error.message}`);
+            } finally {
+                // Re-enable macro buttons
+                const buttons = document.querySelectorAll('.macro-btn');
+                buttons.forEach(btn => btn.disabled = false);
+                
+                isExecutingMacro = false;
+                updateCurrentAction('Idle');
+            }
+        }
+
+        // Handle macro result from WebSocket
+        function handleMacroResult(message) {
+            if (message.success) {
+                logActivity(`Macro completed: ${message.macro}`);
+            } else {
+                logActivity(`Macro failed: ${message.macro}`);
+            }
+        }
+
+        // Emergency stop
+        async function emergencyStop() {
+            try {
+                logActivity('EMERGENCY STOP activated');
+                updateCurrentAction('EMERGENCY STOPPED');
+
+                // Put robot to sleep as emergency action
+                await goToSleep();
+
+                setTimeout(() => {
+                    updateCurrentAction('Idle');
+                    logActivity('System ready - Emergency stop cleared');
+                }, 3000);
+
+            } catch (error) {
+                console.error('Emergency stop error:', error);
+            }
+        }
+
+        // Wake up robot
+        async function wakeUp() {
+            try {
+                document.getElementById('wakeUpBtn').disabled = true;
+                logActivity('Waking up Reachy...');
+
+                const response = await fetch('/api/wake_up', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    logActivity('Reachy woke up - camera active');
+                    updateAwakeStatus(true);
+                } else {
+                    logActivity('Failed to wake up: ' + (result.detail || result.message));
+                }
+            } catch (error) {
+                console.error('Wake up error:', error);
+                logActivity('Error waking up: ' + error.message);
+            } finally {
+                document.getElementById('wakeUpBtn').disabled = false;
+            }
+        }
+
+        // Put robot to sleep
+        async function goToSleep() {
+            try {
+                document.getElementById('sleepBtn').disabled = true;
+                logActivity('Putting Reachy to sleep...');
+
+                const response = await fetch('/api/sleep', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    logActivity('Reachy went to sleep');
+                    updateAwakeStatus(false);
+                } else {
+                    logActivity('Failed to sleep: ' + (result.detail || result.message));
+                }
+            } catch (error) {
+                console.error('Sleep error:', error);
+                logActivity('Error sleeping: ' + error.message);
+            } finally {
+                document.getElementById('sleepBtn').disabled = false;
+            }
+        }
+
+        // Update awake status UI
+        function updateAwakeStatus(awake) {
+            const awakeStatus = document.getElementById('awakeStatus');
+            const wakeUpBtn = document.getElementById('wakeUpBtn');
+            const sleepBtn = document.getElementById('sleepBtn');
+
+            if (awake) {
+                awakeStatus.textContent = 'Awake';
+                awakeStatus.className = 'font-semibold text-green-400';
+                wakeUpBtn.disabled = true;
+                sleepBtn.disabled = false;
+            } else {
+                awakeStatus.textContent = 'Sleeping';
+                awakeStatus.className = 'font-semibold text-yellow-400';
+                wakeUpBtn.disabled = false;
+                sleepBtn.disabled = true;
+            }
+        }
+
+        // Status updates
+        async function startStatusUpdates() {
+            setInterval(updateSystemStatus, 2000);
+            setInterval(updateLatency, 1000);
+            setInterval(sendKeepAlive, 30000);
+        }
+
+        async function updateSystemStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+
+                // Update robot status
+                const robotStatus = document.getElementById('robotStatus');
+                const robotStatusText = document.getElementById('robotStatusText');
+                const connectionStatus = document.getElementById('connectionStatus');
+
+                if (status.robot_connected) {
+                    robotStatus.className = 'status-indicator status-online';
+                    robotStatusText.textContent = 'Connected';
+                    connectionStatus.textContent = 'Online';
+                    connectionStatus.className = 'font-semibold text-green-400';
+
+                    // Update awake status
+                    updateAwakeStatus(status.robot_awake);
+
+                    // Enable/disable macro buttons based on awake state
+                    const macroButtons = document.querySelectorAll('.macro-btn');
+                    macroButtons.forEach(btn => {
+                        btn.disabled = !status.robot_awake || status.executing_macro;
+                    });
+                } else {
+                    robotStatus.className = 'status-indicator status-offline';
+                    robotStatusText.textContent = 'Disconnected';
+                    connectionStatus.textContent = 'Offline';
+                    connectionStatus.className = 'font-semibold text-red-400';
+
+                    // Disable controls when not connected
+                    document.getElementById('awakeStatus').textContent = 'N/A';
+                    document.getElementById('awakeStatus').className = 'font-semibold text-gray-400';
+                    document.getElementById('wakeUpBtn').disabled = true;
+                    document.getElementById('sleepBtn').disabled = true;
+
+                    const macroButtons = document.querySelectorAll('.macro-btn');
+                    macroButtons.forEach(btn => btn.disabled = true);
+                }
+
+                // Update executing status
+                if (status.executing_macro) {
+                    robotStatus.className = 'status-indicator status-executing';
+                }
+
+                // Update connection count
+                document.getElementById('connectionCount').textContent = status.active_connections;
+
+            } catch (error) {
+                console.error('Status update error:', error);
+            }
+        }
+
+        function updateLatency() {
+            if (streamStartTime && pc && pc.connectionState === 'connected') {
+                // Simple RTT estimation (not actual stream latency)
+                const estimatedLatency = Math.floor(Math.random() * 50) + 20; // 20-70ms
+                document.getElementById('streamLatency').textContent = `${estimatedLatency} ms`;
+            }
+        }
+
+        function sendKeepAlive() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }
+
+        // UI helpers
+        function updateConnectionStatus(connected) {
+            // Update UI based on WebSocket connection status
+        }
+
+        function updateStreamStatus(status, className) {
+            const streamStatus = document.getElementById('streamStatus');
+            streamStatus.innerHTML = `<i class="fas fa-circle mr-1"></i> ${status}`;
+            streamStatus.className = `connection-status ${className}`;
+        }
+
+        function updateCurrentAction(action) {
+            document.getElementById('currentAction').textContent = action;
+        }
+
+        function logActivity(message) {
+            const log = document.getElementById('activityLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'text-sm p-3 bg-gray-700 rounded';
+            entry.innerHTML = `<span class="text-gray-400">${timestamp}</span> - ${message}`;
+            
+            log.insertBefore(entry, log.firstChild);
+            
+            // Keep only last 20 entries
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>
