@@ -34,10 +34,6 @@
 
 <p><strong>Official Community Hardware Partner</strong></p>
 <img src="images/roboflow.svg" height="40" />
-<p><strong>Free Annual Core Plan</strong> ($900 Value) with every Field Kit purchase.<br>
-<em>Available until Jan 31st, 2026</em></p>
-<img src="images/roboflow_inference_demo.png" width="80%" />
-
 </div>
 ---
 
