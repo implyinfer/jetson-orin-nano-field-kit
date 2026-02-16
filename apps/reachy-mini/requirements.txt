@@ -1,0 +1,58 @@
+# Reachy Mini Control App Requirements for Jetson Orin Nano
+# Install with: pip install -r requirements.txt
+
+# Reachy SDK for robot control
+reachy-sdk>=1.5.0
+
+# Web framework and WebRTC streaming
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+aiortc>=1.6.0  # WebRTC for Python
+av>=10.0.0  # Audio/video processing for WebRTC
+janus>=1.0.0  # Async/sync queue bridge
+
+# Computer vision and streaming
+opencv-contrib-python>=4.8.0
+numpy>=1.21.2
+pillow>=9.0.0
+
+# Web interface
+jinja2>=3.1.0  # Template engine for FastAPI
+aiofiles>=23.0.0  # Async file serving
+python-multipart>=0.0.6  # Form data handling
+
+# Robot control utilities
+asyncio-mqtt>=0.16.0  # For MQTT communication if needed
+pydantic>=2.0.0  # Data validation
+pydantic-settings>=2.0.0  # Settings management
+
+# System monitoring and logging
+psutil>=5.9.0  # System resource monitoring
+rich>=13.0.0  # Rich console output
+loguru>=0.7.0  # Advanced logging
+
+# Environment and configuration
+python-dotenv>=1.0.0  # Environment variable management
+
+# Optional dependencies for advanced features
+# mediamtx-client  # If integrating with existing MediaMTX setup
+# livekit>=0.11.0  # If using LiveKit for streaming instead of WebRTC
+# flask-socketio>=5.3.0  # Alternative real-time communication
+
+# Development dependencies (optional)
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# isort>=5.12.0
+
+# Note: These packages are typically pre-installed on Jetson with JetPack:
+# - gstreamer (for hardware-accelerated video processing)
+# - v4l-utils (for camera device management)
+# - ffmpeg (for media processing)
+#
+# Hardware acceleration:
+# For optimal performance on Jetson Orin Nano, consider:
+# - Using GStreamer pipelines with nvenc/nvdec
+# - CUDA-accelerated OpenCV operations
+# - Hardware-accelerated WebRTC encoding
