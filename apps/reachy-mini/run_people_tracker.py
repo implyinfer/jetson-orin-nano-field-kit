@@ -18,8 +18,8 @@ try:
 except ImportError as e:
     print(f"Failed to import people_tracker: {e}")
     print("Make sure to install requirements:")
-    print("pip install -r requirements.txt")
-    print("pip install -r people_tracker_requirements.txt")
+    print("  source venv/bin/activate")
+    print("  pip install -r requirements.txt")
     sys.exit(1)
 
 

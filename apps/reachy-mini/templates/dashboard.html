@@ -136,6 +136,10 @@
                             <span id="connectionStatus" class="font-semibold">--</span>
                         </div>
                         <div class="flex justify-between">
+                            <span>State:</span>
+                            <span id="awakeStatus" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between">
                             <span>Safety Mode:</span>
                             <span class="font-semibold text-green-400">
                                 <i class="fas fa-shield-alt mr-1"></i>
@@ -146,6 +150,21 @@
                             <span>Current Action:</span>
                             <span id="currentAction" class="font-semibold">Idle</span>
                         </div>
+                    </div>
+
+                    <!-- Wake/Sleep Controls -->
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <button id="wakeUpBtn" onclick="wakeUp()" class="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors">
+                            <i class="fas fa-sun"></i>
+                            <span>Wake Up</span>
+                        </button>
+                        <button id="sleepBtn" onclick="goToSleep()" class="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 transition-colors">
+                            <i class="fas fa-moon"></i>
+                            <span>Sleep</span>
+                        </button>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-400 text-center">
+                        Wake up Reachy to enable camera and movements
                     </div>
                 </div>
 
@@ -387,17 +406,90 @@
             try {
                 logActivity('EMERGENCY STOP activated');
                 updateCurrentAction('EMERGENCY STOPPED');
-                
-                // Here you would send an emergency stop command to the robot
-                // For now, we'll just log it and reset the UI after a delay
-                
+
+                // Put robot to sleep as emergency action
+                await goToSleep();
+
                 setTimeout(() => {
                     updateCurrentAction('Idle');
                     logActivity('System ready - Emergency stop cleared');
                 }, 3000);
-                
+
             } catch (error) {
                 console.error('Emergency stop error:', error);
+            }
+        }
+
+        // Wake up robot
+        async function wakeUp() {
+            try {
+                document.getElementById('wakeUpBtn').disabled = true;
+                logActivity('Waking up Reachy...');
+
+                const response = await fetch('/api/wake_up', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    logActivity('Reachy woke up - camera active');
+                    updateAwakeStatus(true);
+                } else {
+                    logActivity('Failed to wake up: ' + (result.detail || result.message));
+                }
+            } catch (error) {
+                console.error('Wake up error:', error);
+                logActivity('Error waking up: ' + error.message);
+            } finally {
+                document.getElementById('wakeUpBtn').disabled = false;
+            }
+        }
+
+        // Put robot to sleep
+        async function goToSleep() {
+            try {
+                document.getElementById('sleepBtn').disabled = true;
+                logActivity('Putting Reachy to sleep...');
+
+                const response = await fetch('/api/sleep', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    logActivity('Reachy went to sleep');
+                    updateAwakeStatus(false);
+                } else {
+                    logActivity('Failed to sleep: ' + (result.detail || result.message));
+                }
+            } catch (error) {
+                console.error('Sleep error:', error);
+                logActivity('Error sleeping: ' + error.message);
+            } finally {
+                document.getElementById('sleepBtn').disabled = false;
+            }
+        }
+
+        // Update awake status UI
+        function updateAwakeStatus(awake) {
+            const awakeStatus = document.getElementById('awakeStatus');
+            const wakeUpBtn = document.getElementById('wakeUpBtn');
+            const sleepBtn = document.getElementById('sleepBtn');
+
+            if (awake) {
+                awakeStatus.textContent = 'Awake';
+                awakeStatus.className = 'font-semibold text-green-400';
+                wakeUpBtn.disabled = true;
+                sleepBtn.disabled = false;
+            } else {
+                awakeStatus.textContent = 'Sleeping';
+                awakeStatus.className = 'font-semibold text-yellow-400';
+                wakeUpBtn.disabled = false;
+                sleepBtn.disabled = true;
             }
         }
 
@@ -412,32 +504,50 @@
             try {
                 const response = await fetch('/api/status');
                 const status = await response.json();
-                
+
                 // Update robot status
                 const robotStatus = document.getElementById('robotStatus');
                 const robotStatusText = document.getElementById('robotStatusText');
                 const connectionStatus = document.getElementById('connectionStatus');
-                
+
                 if (status.robot_connected) {
                     robotStatus.className = 'status-indicator status-online';
                     robotStatusText.textContent = 'Connected';
                     connectionStatus.textContent = 'Online';
                     connectionStatus.className = 'font-semibold text-green-400';
+
+                    // Update awake status
+                    updateAwakeStatus(status.robot_awake);
+
+                    // Enable/disable macro buttons based on awake state
+                    const macroButtons = document.querySelectorAll('.macro-btn');
+                    macroButtons.forEach(btn => {
+                        btn.disabled = !status.robot_awake || status.executing_macro;
+                    });
                 } else {
                     robotStatus.className = 'status-indicator status-offline';
                     robotStatusText.textContent = 'Disconnected';
                     connectionStatus.textContent = 'Offline';
                     connectionStatus.className = 'font-semibold text-red-400';
+
+                    // Disable controls when not connected
+                    document.getElementById('awakeStatus').textContent = 'N/A';
+                    document.getElementById('awakeStatus').className = 'font-semibold text-gray-400';
+                    document.getElementById('wakeUpBtn').disabled = true;
+                    document.getElementById('sleepBtn').disabled = true;
+
+                    const macroButtons = document.querySelectorAll('.macro-btn');
+                    macroButtons.forEach(btn => btn.disabled = true);
                 }
-                
+
                 // Update executing status
                 if (status.executing_macro) {
                     robotStatus.className = 'status-indicator status-executing';
                 }
-                
+
                 // Update connection count
                 document.getElementById('connectionCount').textContent = status.active_connections;
-                
+
             } catch (error) {
                 console.error('Status update error:', error);
             }

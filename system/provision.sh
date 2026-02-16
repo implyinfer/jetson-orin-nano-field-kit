@@ -34,6 +34,9 @@ echo "  - Hotspot (WiFi access point)"
 echo ""
 echo "Note: Kiwix setup is skipped (not fully supported yet)"
 echo ""
+echo "Optional add-ons (run separately):"
+echo "  - Reachy Mini: sudo bash system/reachy-mini/setup-reachy-mini-service.sh"
+echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -113,5 +116,8 @@ echo "  sudo systemctl start hotspot"
 echo ""
 echo "To check service status:"
 echo "  sudo systemctl status <service-name>"
+echo ""
+echo "Optional add-ons:"
+echo "  Reachy Mini: sudo bash $SCRIPT_DIR/reachy-mini/setup-reachy-mini-service.sh"
 echo ""
 

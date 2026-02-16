@@ -1,0 +1,30 @@
+[Unit]
+Description=Reachy Mini Control Dashboard
+Documentation=https://huggingface.co/docs/reachy_mini/SDK/installation
+After=network.target
+
+[Service]
+Type=simple
+User=box
+Group=box
+WorkingDirectory=/home/box/jetson-orin-nano-field-kit/apps/reachy-mini
+Environment=PATH=/home/box/jetson-orin-nano-field-kit/apps/reachy-mini/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/box/jetson-orin-nano-field-kit/apps/reachy-mini/venv/bin/python3 main.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=80%
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/box/jetson-orin-nano-field-kit/apps/reachy-mini/logs
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

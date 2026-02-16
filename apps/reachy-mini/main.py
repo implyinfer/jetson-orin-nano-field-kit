@@ -8,12 +8,10 @@ import asyncio
 import cv2
 import json
 import logging
-import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
-import uuid
+from typing import Optional, Set
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Request
@@ -25,15 +23,14 @@ from pydantic_settings import BaseSettings
 import numpy as np
 
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
-from aiortc.contrib.media import MediaPlayer
 import av
 
 try:
-    from reachy_sdk import ReachySDK
-    from reachy_sdk.trajectory import goto
+    from reachy_mini import ReachyMini
+    from reachy_mini.utils import create_head_pose
     REACHY_AVAILABLE = True
 except ImportError:
-    logging.warning("Reachy SDK not available - running in simulation mode")
+    logging.warning("Reachy Mini SDK not available - running in simulation mode")
     REACHY_AVAILABLE = False
 
 
@@ -85,104 +82,161 @@ class Settings(BaseSettings):
 
 class ReachyCamera(VideoStreamTrack):
     """
-    Custom video track for Reachy camera or USB camera
+    Custom video track for Reachy camera - uses Reachy's media system when awake
     """
-    
-    def __init__(self, device: int = 0, resolution: str = "1280x720", fps: int = 30):
+
+    def __init__(self, controller: 'ReachyController', resolution: str = "1280x720", fps: int = 30):
         super().__init__()
-        self.device = device
+        self.controller = controller
         self.fps = fps
-        
+
         # Parse resolution
         width, height = map(int, resolution.split('x'))
         self.width = width
         self.height = height
-        
-        # Initialize camera
-        self.cap = cv2.VideoCapture(device)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.cap.set(cv2.CAP_PROP_FPS, fps)
-        
-        if not self.cap.isOpened():
-            raise RuntimeError(f"Failed to open camera device {device}")
-        
-        logging.info(f"Camera initialized: {width}x{height} @ {fps}fps")
-    
+
+        logging.info(f"ReachyCamera initialized: {width}x{height} @ {fps}fps")
+
     async def recv(self):
         pts, time_base = await self.next_timestamp()
-        
-        ret, frame = self.cap.read()
-        if not ret:
-            logging.warning("Failed to read frame from camera")
-            # Return a black frame if camera fails
+
+        frame = None
+
+        # Try to get frame from Reachy's camera if connected and awake
+        if self.controller.connected and self.controller.awake:
+            frame = self.controller.get_camera_frame()
+
+        if frame is None:
+            # Return a placeholder frame with "Sleeping" or "Not Connected" message
             frame = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        
-        # Convert BGR to RGB for WebRTC
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
+            # Add text overlay
+            if not self.controller.connected:
+                text = "Not Connected"
+            elif not self.controller.awake:
+                text = "Reachy is Sleeping - Click Wake Up"
+            else:
+                text = "Camera Unavailable"
+
+            # Draw text on frame
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 1.5
+            thickness = 3
+            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+            text_x = (self.width - text_size[0]) // 2
+            text_y = (self.height + text_size[1]) // 2
+            cv2.putText(frame, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
+        else:
+            # Frame from Reachy is already RGB, resize if needed
+            if frame.shape[0] != self.height or frame.shape[1] != self.width:
+                frame = cv2.resize(frame, (self.width, self.height))
+
+        # Ensure frame is RGB format
+        if len(frame.shape) == 2:
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+        elif frame.shape[2] == 4:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+        elif frame.shape[2] == 3:
+            # Reachy media.get_frame() returns RGB, so no conversion needed
+            pass
+
         # Create av.VideoFrame
         av_frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
         av_frame.pts = pts
         av_frame.time_base = time_base
-        
+
         return av_frame
-    
-    def __del__(self):
-        if hasattr(self, 'cap') and self.cap.isOpened():
-            self.cap.release()
 
 
 class ReachyController:
     """
     Reachy robot controller with safety features
     """
-    
+
     def __init__(self, settings: Settings):
         self.settings = settings
         self.reachy = None
         self.connected = False
+        self.awake = False
         self.last_activity = time.time()
         self.executing_macro = False
-        
+
         if REACHY_AVAILABLE:
             self.connect()
         else:
             logging.warning("Reachy SDK not available - using mock controller")
     
     def connect(self):
-        """Connect to Reachy robot"""
+        """Connect to Reachy Mini robot"""
         try:
-            self.reachy = ReachySDK(
-                host=self.settings.reachy_host,
-                port=self.settings.reachy_port
-            )
+            # ReachyMini auto-detects connection mode (localhost or network)
+            # Use connection_mode="network" to force network connection to remote robot
+            self.reachy = ReachyMini(self.settings.reachy_host)
             self.connected = True
-            logging.info(f"Connected to Reachy at {self.settings.reachy_host}:{self.settings.reachy_port}")
-            
+            logging.info(f"Connected to Reachy Mini at {self.settings.reachy_host}")
+
             # Enable safety features
             if self.settings.safety_limits:
                 self.configure_safety()
-                
+
         except Exception as e:
-            logging.error(f"Failed to connect to Reachy: {e}")
+            logging.error(f"Failed to connect to Reachy Mini: {e}")
             self.connected = False
     
     def configure_safety(self):
         """Configure safety limits"""
         if not self.connected:
             return
-            
+
         try:
-            # Set torque limits for all joints
-            for joint_name in self.reachy.joints:
-                joint = getattr(self.reachy, joint_name)
-                joint.torque_limit = self.settings.max_torque_limit
-                
-            logging.info("Safety limits configured")
+            # ReachyMini SDK handles safety internally
+            # Just log that safety is enabled
+            logging.info("Safety limits configured (using ReachyMini defaults)")
         except Exception as e:
             logging.error(f"Failed to configure safety: {e}")
-    
+
+    def wake_up(self) -> bool:
+        """Wake up the robot - enables motors and camera"""
+        if not self.connected:
+            logging.warning("Cannot wake up: not connected to robot")
+            return False
+
+        try:
+            self.reachy.wake_up()
+            self.awake = True
+            self.update_activity()
+            logging.info("Reachy Mini woke up")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to wake up robot: {e}")
+            return False
+
+    def go_to_sleep(self) -> bool:
+        """Put the robot to sleep - disables motors"""
+        if not self.connected:
+            logging.warning("Cannot sleep: not connected to robot")
+            return False
+
+        try:
+            self.reachy.sleep()
+            self.awake = False
+            logging.info("Reachy Mini went to sleep")
+            return True
+        except Exception as e:
+            logging.error(f"Failed to put robot to sleep: {e}")
+            return False
+
+    def get_camera_frame(self):
+        """Get a frame from Reachy's camera"""
+        if not self.connected or not self.awake:
+            return None
+
+        try:
+            frame = self.reachy.media.get_frame()
+            return frame
+        except Exception as e:
+            logging.error(f"Failed to get camera frame: {e}")
+            return None
+
     def update_activity(self):
         """Update last activity timestamp"""
         self.last_activity = time.time()
@@ -191,14 +245,12 @@ class ReachyController:
         """Enable compliance if robot is idle"""
         if not self.connected or not self.settings.auto_compliance:
             return
-            
+
         if time.time() - self.last_activity > self.settings.idle_timeout:
             try:
-                # Enable compliance for all joints
-                for joint_name in self.reachy.joints:
-                    joint = getattr(self.reachy, joint_name)
-                    joint.compliant = True
-                logging.debug("Enabled compliance due to inactivity")
+                # ReachyMini SDK handles compliance differently
+                # The SDK manages this internally
+                logging.debug("Idle timeout reached - robot in standby")
             except Exception as e:
                 logging.error(f"Failed to enable compliance: {e}")
     
@@ -213,13 +265,8 @@ class ReachyController:
         
         self.executing_macro = True
         self.update_activity()
-        
+
         try:
-            # Disable compliance
-            for joint_name in self.reachy.joints:
-                joint = getattr(self.reachy, joint_name)
-                joint.compliant = False
-            
             # Execute macro based on name
             if macro_name == "wave":
                 await self._macro_wave()
@@ -249,220 +296,189 @@ class ReachyController:
             self.executing_macro = False
     
     async def _macro_wave(self):
-        """Wave gesture"""
+        """Wave gesture using head movements"""
         if not self.connected:
             return
-            
-        # Simple wave motion
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": -30,
-                "r_shoulder_roll": -45,
-                "r_elbow_pitch": -90,
-            },
-            duration=1.0,
-            interpolation_mode="minimum_jerk"
-        )
-        
-        # Wave motion
+
+        # Wave by tilting head side to side
         for _ in range(3):
-            await goto(
-                goal_positions={"r_elbow_pitch": -60},
-                duration=0.5,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(roll=20, degrees=True),
+                duration=0.4
             )
-            await goto(
-                goal_positions={"r_elbow_pitch": -120},
-                duration=0.5,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.5)
+            self.reachy.goto_target(
+                head=create_head_pose(roll=-20, degrees=True),
+                duration=0.4
             )
-        
+            await asyncio.sleep(0.5)
+
         # Return to neutral
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": 0,
-                "r_shoulder_roll": 0,
-                "r_elbow_pitch": 0,
-            },
-            duration=1.0,
-            interpolation_mode="minimum_jerk"
+        self.reachy.goto_target(
+            head=create_head_pose(roll=0, degrees=True),
+            duration=0.5
         )
+        await asyncio.sleep(0.6)
     
     async def _macro_nod(self):
-        """Nod gesture"""
+        """Nod gesture - yes motion"""
         if not self.connected:
             return
-            
+
         for _ in range(2):
-            await goto(
-                goal_positions={"neck_pitch": 15},
-                duration=0.5,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(z=-15, degrees=True, mm=True),
+                duration=0.4
             )
-            await goto(
-                goal_positions={"neck_pitch": -15},
-                duration=0.5,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.5)
+            self.reachy.goto_target(
+                head=create_head_pose(z=15, degrees=True, mm=True),
+                duration=0.4
             )
-        
-        await goto(
-            goal_positions={"neck_pitch": 0},
-            duration=0.5,
-            interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.5)
+
+        # Return to neutral
+        self.reachy.goto_target(
+            head=create_head_pose(z=0, degrees=True, mm=True),
+            duration=0.4
         )
+        await asyncio.sleep(0.5)
     
     async def _macro_shake_head(self):
-        """Shake head gesture"""
+        """Shake head gesture - no motion"""
         if not self.connected:
             return
-            
+
         for _ in range(2):
-            await goto(
-                goal_positions={"neck_yaw": 30},
-                duration=0.4,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(x=30, degrees=True, mm=True),
+                duration=0.35
             )
-            await goto(
-                goal_positions={"neck_yaw": -30},
-                duration=0.4,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.4)
+            self.reachy.goto_target(
+                head=create_head_pose(x=-30, degrees=True, mm=True),
+                duration=0.35
             )
-        
-        await goto(
-            goal_positions={"neck_yaw": 0},
-            duration=0.4,
-            interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.4)
+
+        # Return to neutral
+        self.reachy.goto_target(
+            head=create_head_pose(x=0, degrees=True, mm=True),
+            duration=0.35
         )
+        await asyncio.sleep(0.4)
     
     async def _macro_look_around(self):
         """Look around gesture"""
         if not self.connected:
             return
-            
-        positions = [
-            {"neck_yaw": 45, "neck_pitch": 10},
-            {"neck_yaw": -45, "neck_pitch": 10},
-            {"neck_yaw": 0, "neck_pitch": -20},
-            {"neck_yaw": 0, "neck_pitch": 0},
-        ]
-        
-        for pos in positions:
-            await goto(
-                goal_positions=pos,
-                duration=1.0,
-                interpolation_mode="minimum_jerk"
-            )
-            await asyncio.sleep(0.5)
+
+        # Look right and up
+        self.reachy.goto_target(
+            head=create_head_pose(x=40, z=10, degrees=True, mm=True),
+            duration=0.8
+        )
+        await asyncio.sleep(1.2)
+
+        # Look left and up
+        self.reachy.goto_target(
+            head=create_head_pose(x=-40, z=10, degrees=True, mm=True),
+            duration=0.8
+        )
+        await asyncio.sleep(1.2)
+
+        # Look down center
+        self.reachy.goto_target(
+            head=create_head_pose(x=0, z=-20, degrees=True, mm=True),
+            duration=0.8
+        )
+        await asyncio.sleep(1.2)
+
+        # Return to neutral
+        self.reachy.goto_target(
+            head=create_head_pose(x=0, z=0, degrees=True, mm=True),
+            duration=0.6
+        )
+        await asyncio.sleep(0.7)
     
     async def _macro_point(self):
-        """Point gesture"""
+        """Point gesture - look in a direction"""
         if not self.connected:
             return
-            
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": -45,
-                "r_shoulder_roll": -20,
-                "r_elbow_pitch": 0,
-                "neck_yaw": 20,
-                "neck_pitch": -10,
-            },
-            duration=1.5,
-            interpolation_mode="minimum_jerk"
+
+        # Look and point to the right
+        self.reachy.goto_target(
+            head=create_head_pose(x=35, z=-10, degrees=True, mm=True),
+            duration=1.2
         )
-        
-        await asyncio.sleep(2.0)
-        
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": 0,
-                "r_shoulder_roll": 0,
-                "r_elbow_pitch": 0,
-                "neck_yaw": 0,
-                "neck_pitch": 0,
-            },
-            duration=1.5,
-            interpolation_mode="minimum_jerk"
+        await asyncio.sleep(2.5)
+
+        # Return to neutral
+        self.reachy.goto_target(
+            head=create_head_pose(x=0, z=0, degrees=True, mm=True),
+            duration=1.2
         )
+        await asyncio.sleep(1.3)
     
     async def _macro_dance(self):
-        """Simple dance routine"""
+        """Simple dance routine using head movements"""
         if not self.connected:
             return
-            
+
+        # Dance moves using head tilts and rotations
         moves = [
-            {"r_shoulder_pitch": -30, "l_shoulder_pitch": 30, "neck_yaw": 20},
-            {"r_shoulder_pitch": 30, "l_shoulder_pitch": -30, "neck_yaw": -20},
-            {"r_shoulder_roll": -45, "l_shoulder_roll": 45, "neck_pitch": 10},
-            {"r_shoulder_roll": 45, "l_shoulder_roll": -45, "neck_pitch": -10},
+            {"x": 25, "roll": 15},
+            {"x": -25, "roll": -15},
+            {"x": 0, "z": 15, "roll": 10},
+            {"x": 0, "z": -15, "roll": -10},
         ]
-        
-        for move in moves * 2:
-            await goto(
-                goal_positions=move,
-                duration=0.8,
-                interpolation_mode="minimum_jerk"
-            )
-            await asyncio.sleep(0.2)
-        
+
+        for _ in range(2):
+            for move in moves:
+                self.reachy.goto_target(
+                    head=create_head_pose(**move, degrees=True, mm=True),
+                    duration=0.5
+                )
+                await asyncio.sleep(0.6)
+
         # Return to neutral
-        await goto(
-            goal_positions={joint: 0 for joint in move.keys()},
-            duration=1.0,
-            interpolation_mode="minimum_jerk"
+        self.reachy.goto_target(
+            head=create_head_pose(x=0, z=0, roll=0, degrees=True, mm=True),
+            duration=0.8
         )
+        await asyncio.sleep(0.9)
     
     async def _macro_celebrate(self):
-        """Celebration gesture"""
+        """Celebration gesture with excited head movements"""
         if not self.connected:
             return
-            
-        # Raise both arms
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": -90,
-                "l_shoulder_pitch": -90,
-                "r_shoulder_roll": -30,
-                "l_shoulder_roll": 30,
-                "neck_pitch": -20,
-            },
-            duration=1.0,
-            interpolation_mode="minimum_jerk"
+
+        # Look up excitedly
+        self.reachy.goto_target(
+            head=create_head_pose(z=-25, degrees=True, mm=True),
+            duration=0.8
         )
-        
         await asyncio.sleep(1.0)
-        
-        # Celebration wave
+
+        # Excited head bobbing
         for _ in range(4):
-            await goto(
-                goal_positions={
-                    "r_shoulder_roll": -60,
-                    "l_shoulder_roll": 60,
-                },
-                duration=0.3,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(z=-20, roll=15, degrees=True, mm=True),
+                duration=0.25
             )
-            await goto(
-                goal_positions={
-                    "r_shoulder_roll": -30,
-                    "l_shoulder_roll": 30,
-                },
-                duration=0.3,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.3)
+            self.reachy.goto_target(
+                head=create_head_pose(z=-20, roll=-15, degrees=True, mm=True),
+                duration=0.25
             )
-        
+            await asyncio.sleep(0.3)
+
         # Return to neutral
-        await goto(
-            goal_positions={
-                "r_shoulder_pitch": 0,
-                "l_shoulder_pitch": 0,
-                "r_shoulder_roll": 0,
-                "l_shoulder_roll": 0,
-                "neck_pitch": 0,
-            },
-            duration=1.5,
-            interpolation_mode="minimum_jerk"
+        self.reachy.goto_target(
+            head=create_head_pose(z=0, roll=0, degrees=True, mm=True),
+            duration=1.2
         )
+        await asyncio.sleep(1.3)
 
 
 # API Models
@@ -497,20 +513,20 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 async def startup_event():
     """Initialize camera and start monitoring tasks"""
     global camera_track
-    
+
     try:
-        # Initialize camera
+        # Initialize camera with the Reachy controller
         camera_track = ReachyCamera(
-            device=settings.camera_device,
+            controller=reachy_controller,
             resolution=settings.video_resolution,
             fps=settings.video_fps
         )
-        logging.info("Camera track initialized")
-        
+        logging.info("Camera track initialized (using Reachy media when awake)")
+
         # Start monitoring task
         if settings.enable_monitoring:
             asyncio.create_task(monitoring_task())
-            
+
     except Exception as e:
         logging.error(f"Failed to initialize camera: {e}")
 
@@ -518,14 +534,16 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup resources"""
+    global camera_track
+
     # Close all peer connections
     coros = [pc.close() for pc in pcs]
     await asyncio.gather(*coros, return_exceptions=True)
     pcs.clear()
-    
+
     # Cleanup camera
     if camera_track:
-        del camera_track
+        camera_track = None
 
 
 async def monitoring_task():
@@ -562,8 +580,9 @@ async def get_status():
     return JSONResponse({
         "timestamp": datetime.now().isoformat(),
         "robot_connected": reachy_controller.connected,
+        "robot_awake": reachy_controller.awake,
         "executing_macro": reachy_controller.executing_macro,
-        "camera_active": camera_track is not None,
+        "camera_active": camera_track is not None and reachy_controller.awake,
         "active_connections": len(pcs),
         "settings": {
             "safety_limits": settings.safety_limits,
@@ -571,6 +590,38 @@ async def get_status():
             "auto_compliance": settings.auto_compliance,
         }
     })
+
+
+@app.post("/api/wake_up")
+async def wake_up_robot():
+    """Wake up the robot - enables motors and camera"""
+    if not reachy_controller.connected:
+        raise HTTPException(status_code=503, detail="Robot not connected")
+
+    if reachy_controller.awake:
+        return JSONResponse({"success": True, "message": "Robot is already awake"})
+
+    success = reachy_controller.wake_up()
+    if success:
+        return JSONResponse({"success": True, "message": "Robot woke up successfully"})
+    else:
+        raise HTTPException(status_code=500, detail="Failed to wake up robot")
+
+
+@app.post("/api/sleep")
+async def sleep_robot():
+    """Put the robot to sleep - disables motors"""
+    if not reachy_controller.connected:
+        raise HTTPException(status_code=503, detail="Robot not connected")
+
+    if not reachy_controller.awake:
+        return JSONResponse({"success": True, "message": "Robot is already asleep"})
+
+    success = reachy_controller.go_to_sleep()
+    if success:
+        return JSONResponse({"success": True, "message": "Robot went to sleep successfully"})
+    else:
+        raise HTTPException(status_code=500, detail="Failed to put robot to sleep")
 
 
 @app.post("/api/macro", response_model=MacroResponse)

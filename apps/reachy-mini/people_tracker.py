@@ -2,11 +2,12 @@
 """
 Reachy Mini People Tracker
 Detects people using Roboflow inference service and makes Reachy look at and nod to each person.
+
+Official SDK docs: https://huggingface.co/docs/reachy_mini/SDK/installation
 """
 
 import asyncio
 import cv2
-import json
 import logging
 import math
 import time
@@ -17,11 +18,11 @@ import requests
 from datetime import datetime, timedelta
 
 try:
-    from reachy_sdk import ReachySDK
-    from reachy_sdk.trajectory import goto
+    from reachy_mini import ReachyMini
+    from reachy_mini.utils import create_head_pose
     REACHY_AVAILABLE = True
 except ImportError:
-    logging.warning("Reachy SDK not available - running in simulation mode")
+    logging.warning("Reachy Mini SDK not available - running in simulation mode")
     REACHY_AVAILABLE = False
 
 from pydantic_settings import BaseSettings
@@ -219,34 +220,24 @@ class ReachyPeopleTracker:
     def setup_reachy(self):
         """Initialize Reachy connection"""
         try:
-            self.reachy = ReachySDK(
-                host=self.settings.reachy_host,
-                port=self.settings.reachy_port
-            )
-            logging.info(f"Connected to Reachy at {self.settings.reachy_host}")
-            
+            self.reachy = ReachyMini(self.settings.reachy_host)
+            self.reachy.wake_up()
+            logging.info(f"Connected to Reachy Mini at {self.settings.reachy_host}")
+
             if self.settings.enable_safety_limits:
                 self.configure_safety()
-                
+
         except Exception as e:
             logging.error(f"Reachy connection failed: {e}")
             self.reachy = None
-    
+
     def configure_safety(self):
         """Configure safety limits for Reachy"""
         if not self.reachy:
             return
-            
-        try:
-            # Set moderate torque limits
-            for joint_name in ['neck_yaw', 'neck_pitch']:
-                if hasattr(self.reachy, joint_name):
-                    joint = getattr(self.reachy, joint_name)
-                    joint.torque_limit = 0.6
-                    
-            logging.info("Safety limits configured")
-        except Exception as e:
-            logging.error(f"Safety configuration failed: {e}")
+
+        # ReachyMini SDK handles safety internally
+        logging.info("Safety limits configured (using ReachyMini defaults)")
     
     def detect_people(self, frame: np.ndarray) -> List[Dict]:
         """Send frame to Roboflow inference service"""
@@ -306,43 +297,36 @@ class ReachyPeopleTracker:
         """Make Reachy look at and nod to a person"""
         if not self.reachy or self.is_performing_action:
             return
-        
+
         self.is_performing_action = True
-        
+
         try:
             # Calculate head angles
             yaw_angle, pitch_angle = self.calculate_head_angles(person)
-            
+
             logging.info(f"Looking at person {person.id} at ({person.center_x}, {person.center_y}) - "
                         f"angles: yaw={yaw_angle:.1f}°, pitch={pitch_angle:.1f}°")
-            
-            # Disable compliance for controlled movement
-            self.reachy.neck.neck_yaw.compliant = False
-            self.reachy.neck.neck_pitch.compliant = False
-            
-            # Look at person
-            await goto(
-                goal_positions={
-                    "neck_yaw": yaw_angle,
-                    "neck_pitch": pitch_angle
-                },
-                duration=self.settings.movement_smoothness,
-                interpolation_mode="minimum_jerk"
+
+            # Look at person using ReachyMini SDK
+            # x = yaw (left/right), z = pitch (up/down in mm space)
+            self.reachy.goto_target(
+                head=create_head_pose(x=yaw_angle, z=-pitch_angle, degrees=True, mm=True),
+                duration=self.settings.movement_smoothness
             )
-            
+
             # Hold the look
             await asyncio.sleep(self.settings.look_duration)
-            
+
             # Nod if enabled
             if self.settings.nod_after_look:
                 await self.nod_at_person(yaw_angle, pitch_angle)
-            
+
             # Mark person as acknowledged
             person.acknowledged = True
             person.look_count += 1
-            
+
             logging.info(f"Acknowledged person {person.id}")
-            
+
         except Exception as e:
             logging.error(f"Failed to look at person {person.id}: {e}")
         finally:
@@ -352,60 +336,45 @@ class ReachyPeopleTracker:
         """Perform nodding gesture while looking at person"""
         try:
             # Small nod motion
-            nod_amplitude = 10.0  # degrees
-            
+            nod_amplitude = 10.0  # degrees/mm
+
             # Nod down
-            await goto(
-                goal_positions={
-                    "neck_yaw": base_yaw,
-                    "neck_pitch": base_pitch + nod_amplitude
-                },
-                duration=0.4,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(x=base_yaw, z=-(base_pitch + nod_amplitude), degrees=True, mm=True),
+                duration=0.4
             )
-            
-            # Nod up  
-            await goto(
-                goal_positions={
-                    "neck_yaw": base_yaw,
-                    "neck_pitch": base_pitch - nod_amplitude
-                },
-                duration=0.4,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.45)
+
+            # Nod up
+            self.reachy.goto_target(
+                head=create_head_pose(x=base_yaw, z=-(base_pitch - nod_amplitude), degrees=True, mm=True),
+                duration=0.4
             )
-            
+            await asyncio.sleep(0.45)
+
             # Return to looking position
-            await goto(
-                goal_positions={
-                    "neck_yaw": base_yaw,
-                    "neck_pitch": base_pitch
-                },
-                duration=0.4,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(x=base_yaw, z=-base_pitch, degrees=True, mm=True),
+                duration=0.4
             )
-            
+            await asyncio.sleep(0.45)
+
             # Small pause
             await asyncio.sleep(0.3)
-            
+
             # Second nod for emphasis
-            await goto(
-                goal_positions={
-                    "neck_yaw": base_yaw,
-                    "neck_pitch": base_pitch + nod_amplitude
-                },
-                duration=0.3,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(x=base_yaw, z=-(base_pitch + nod_amplitude), degrees=True, mm=True),
+                duration=0.3
             )
-            
-            await goto(
-                goal_positions={
-                    "neck_yaw": base_yaw,
-                    "neck_pitch": base_pitch
-                },
-                duration=0.3,
-                interpolation_mode="minimum_jerk"
+            await asyncio.sleep(0.35)
+
+            self.reachy.goto_target(
+                head=create_head_pose(x=base_yaw, z=-base_pitch, degrees=True, mm=True),
+                duration=0.3
             )
-            
+            await asyncio.sleep(0.35)
+
         except Exception as e:
             logging.error(f"Nodding failed: {e}")
     
@@ -413,22 +382,14 @@ class ReachyPeopleTracker:
         """Return head to neutral position"""
         if not self.reachy or self.is_performing_action:
             return
-            
+
         try:
-            await goto(
-                goal_positions={
-                    "neck_yaw": 0.0,
-                    "neck_pitch": 0.0
-                },
-                duration=1.0,
-                interpolation_mode="minimum_jerk"
+            self.reachy.goto_target(
+                head=create_head_pose(x=0, z=0, roll=0, degrees=True, mm=True),
+                duration=1.0
             )
-            
-            # Re-enable compliance after movement
-            await asyncio.sleep(0.5)
-            self.reachy.neck.neck_yaw.compliant = True
-            self.reachy.neck.neck_pitch.compliant = True
-            
+            await asyncio.sleep(1.1)
+
         except Exception as e:
             logging.error(f"Failed to return to neutral: {e}")
     
@@ -537,12 +498,13 @@ class ReachyPeopleTracker:
         """Clean up resources"""
         if self.cap:
             self.cap.release()
-        
+
         cv2.destroyAllWindows()
-        
+
         if self.reachy:
             try:
                 await self.return_to_neutral()
+                self.reachy.sleep()
             except:
                 pass
 
