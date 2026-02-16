@@ -21,7 +21,7 @@ Complete guide for setting up RTSP streaming from IMX219 cameras on Jetson Orin 
 - Network connection
 
 ### Software Requirements
-- JetPack 6.2 installed
+- JetPack 6.2.2 installed
 - Ubuntu 22.04 (comes with JetPack)
 - Internet connection for downloading MediaMTX
 

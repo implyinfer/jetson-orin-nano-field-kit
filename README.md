@@ -22,7 +22,7 @@
 
 | **Production-Ready Hardware** | **Optimized Software Stack** |
 | :--- | :--- |
-| ✅ **Dual Stereo IMX219** (160° FOV) |  **Built on JetPack 6.2.1** |
+| ✅ **Dual Stereo IMX219** (160° FOV) |  **Built on JetPack 6.2.2** |
 | ✅ **Bootable NVMe SSD** (Pre-flashed) | **10+ vision, language, and speech models preinstalled** |
 | ✅ **AC600 WiFi** (AP + Station Mode) |  **Low-Latency MediaMTX Streaming** |
 | ✅ **Custom Case** (Rigid Camera Mount) |  **PyTorch, TensorRT, OpenCV, CTranslate2, Llamacpp, Whisper Pre-built for Cuda 12.6** |
@@ -70,9 +70,10 @@ This repository contains the application software stack for the Jetson Orin Nano
 -   ✅ **Custom Case**: Protects the board and holds cameras rigid for stable calibration.
 
 ### Software Stack
-It runs a fully open source custom **JetPack 6.2.1** image that is maintained and updated frequently.
+It runs a fully open source custom **JetPack 6.2.2** image that is maintained and updated frequently.
 
 -   **Ready to Run**: Docker, Livekit, Ollama, Llama.cpp, Roboflow Inference Server, 10+ vision/language models pre-installed.
+-   **Reachy Mini Integration**: Optional app for [Pollen Robotics](https://www.pollen-robotics.com/) Reachy Mini—web dashboard (live video, entertainment macros), and people tracker (Roboflow-based look-and-nod greeting). See [apps/reachy-mini](apps/reachy-mini/README.md).
 -   **Optimized for CUDA 12.6**: Pre-compiled TensorRT, PyTorch, OpenCV (with GStreamer/V4L2 support), CTranslate, Cusparselt, etc.
 -   **Connectivity**: Configured for low-latency MediaMTX camera streams and AP + STA WiFi mode.
 
@@ -184,6 +185,11 @@ Run LLMs locally without cloud dependencies. Includes Open WebUI.
 ### 🗣️ Voice Assistant
 Wake word-enabled voice assistant with tool calling and offline capabilities.
 - **[Read the Guide](https://implyinfer.com/docs/voice-assistant)**
+
+### 🤖 Reachy Mini Integration
+Optional integration for [Reachy Mini](https://www.pollen-robotics.com/) robot: web control dashboard with live WebRTC video and entertainment macros, plus a people tracker that uses the Field Kit’s Roboflow inference to make Reachy look at and nod to detected people.
+- **Control Dashboard**: [apps/reachy-mini/README.md](apps/reachy-mini/README.md) — Dashboard at `http://<jetson-ip>:8080`
+- **People Tracker**: [apps/reachy-mini/PEOPLE_TRACKER_README.md](apps/reachy-mini/PEOPLE_TRACKER_README.md) — Roboflow-based detection and greeting
 
 ## System Reference
 
