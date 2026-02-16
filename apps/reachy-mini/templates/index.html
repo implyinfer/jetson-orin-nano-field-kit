@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🤖 Reachy Mini Entertainment System 🎪</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 3em;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .status-panel {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .game-card {
+            background: rgba(255,255,255,0.15);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .game-card h3 {
+            margin-top: 0;
+            font-size: 1.5em;
+        }
+        .game-button {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+        .game-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .game-button:active {
+            transform: scale(0.95);
+        }
+        .basic-button {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+        .enhanced-button {
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+        }
+        .ultimate-button {
+            background: linear-gradient(45deg, #ffd89b, #19547b);
+            font-size: 18px;
+            padding: 15px 30px;
+        }
+        .log-panel {
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: scroll;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .emergency-stop {
+            background: linear-gradient(45deg, #e74c3c, #c0392b) !important;
+            font-size: 20px;
+            padding: 15px 30px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .status-good { color: #2ecc71; }
+        .status-busy { color: #f39c12; }
+        .status-error { color: #e74c3c; }
+        .emoji { font-size: 1.5em; margin-right: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Reachy Mini Entertainment System 🎪</h1>
+            <p>Welcome to the most fun robot in the world!</p>
+        </div>
+
+        <div class="status-panel">
+            <h2>🔧 System Status</h2>
+            <p><strong>Current Activity:</strong> <span id="current-activity">{{ current_activity }}</span></p>
+            <p><strong>Status:</strong> <span id="activity-status" class="status-good">{{ activity_status }}</span></p>
+            <button class="game-button emergency-stop" onclick="emergencyStop()">
+                🛑 EMERGENCY STOP
+            </button>
+        </div>
+
+        <div class="games-grid">
+            <!-- Basic Behaviors -->
+            <div class="game-card">
+                <h3>🌟 Basic Behaviors</h3>
+                <p>Simple and classic robot moves</p>
+                <button class="game-button basic-button" onclick="runActivity('wake')">
+                    <span class="emoji">☀️</span>Wake Up
+                </button>
+                <button class="game-button basic-button" onclick="runActivity('wave')">
+                    <span class="emoji">👋</span>Wave Hello
+                </button>
+                <button class="game-button basic-button" onclick="runActivity('dance')">
+                    <span class="emoji">💃</span>Dance
+                </button>
+                <button class="game-button basic-button" onclick="runActivity('sleep')">
+                    <span class="emoji">😴</span>Sleep
+                </button>
+            </div>
+
+            <!-- Vision Games -->
+            <div class="game-card">
+                <h3>👁️ Vision Games</h3>
+                <p>Interactive games using camera vision</p>
+                <button class="game-button enhanced-button" onclick="runActivity('object_hunt')">
+                    <span class="emoji">🔍</span>Object Hunt
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('simon_vision')">
+                    <span class="emoji">🎮</span>Simon Says
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('colors')">
+                    <span class="emoji">🎨</span>Color Game
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('dance_detect')">
+                    <span class="emoji">🕺</span>Dance Together
+                </button>
+            </div>
+
+            <!-- AI Conversations -->
+            <div class="game-card">
+                <h3>🧠 AI Conversations</h3>
+                <p>Smart talks and storytelling</p>
+                <button class="game-button enhanced-button" onclick="runActivity('chat_kids')">
+                    <span class="emoji">🧒</span>Chat with Kids
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('chat_adults')">
+                    <span class="emoji">👥</span>Chat with Adults
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('story')">
+                    <span class="emoji">📚</span>Tell Story
+                </button>
+            </div>
+
+            <!-- Random Fun -->
+            <div class="game-card">
+                <h3>🎲 Random Fun</h3>
+                <p>Let Reachy surprise you!</p>
+                <button class="game-button enhanced-button" onclick="runActivity('random_enhanced')">
+                    <span class="emoji">🎲</span>Random Game
+                </button>
+                <button class="game-button enhanced-button" onclick="runActivity('emotions')">
+                    <span class="emoji">😊</span>Emotion Mirror
+                </button>
+                <button class="game-button ultimate-button" onclick="runActivity('ultimate')">
+                    <span class="emoji">🎊</span>ULTIMATE SESSION
+                </button>
+            </div>
+        </div>
+
+        <div class="log-panel">
+            <h3>📋 Activity Log</h3>
+            <div id="activity-log">
+                <p>System ready! Choose an activity to start the fun! 🚀</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logCount = 0;
+        
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('current-activity').textContent = data.current_activity;
+                    const statusElement = document.getElementById('activity-status');
+                    statusElement.textContent = data.activity_status;
+                    
+                    // Update status color
+                    statusElement.className = '';
+                    if (data.activity_status === 'Running') {
+                        statusElement.classList.add('status-busy');
+                    } else if (data.activity_status === 'Error') {
+                        statusElement.classList.add('status-error');
+                    } else {
+                        statusElement.classList.add('status-good');
+                    }
+                    
+                    // Update log if there are new messages
+                    if (data.logs && data.logs.length > 0) {
+                        const logDiv = document.getElementById('activity-log');
+                        data.logs.forEach(log => {
+                            const p = document.createElement('p');
+                            p.textContent = log;
+                            logDiv.appendChild(p);
+                        });
+                        logDiv.scrollTop = logDiv.scrollHeight;
+                    }
+                })
+                .catch(err => console.error('Status update failed:', err));
+        }
+        
+        function runActivity(activity) {
+            addLog(`🚀 Starting ${activity}...`);
+            
+            fetch('/run', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({activity: activity})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addLog(`✅ ${activity} started successfully!`);
+                } else {
+                    addLog(`❌ Failed to start ${activity}: ${data.error}`);
+                }
+            })
+            .catch(err => {
+                addLog(`💥 Error running ${activity}: ${err}`);
+            });
+        }
+        
+        function emergencyStop() {
+            addLog('🛑 EMERGENCY STOP ACTIVATED!');
+            
+            fetch('/emergency_stop', {method: 'POST'})
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addLog('✅ Emergency stop successful');
+                    } else {
+                        addLog('❌ Emergency stop failed');
+                    }
+                })
+                .catch(err => addLog(`💥 Emergency stop error: ${err}`));
+        }
+        
+        function addLog(message) {
+            const logDiv = document.getElementById('activity-log');
+            const p = document.createElement('p');
+            const timestamp = new Date().toLocaleTimeString();
+            p.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Update status every 2 seconds
+        setInterval(updateStatus, 2000);
+        updateStatus(); // Initial update
+    </script>
+</body>
+</html>
+    
