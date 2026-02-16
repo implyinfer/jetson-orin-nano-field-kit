@@ -34,3 +34,16 @@ python-dotenv>=1.0.0
 
 # HTTP client (for people tracker integration with Roboflow)
 requests>=2.31.0
+
+# Entertainment system additional dependencies
+flask>=2.3.0
+scipy>=1.9.0
+
+# Text-to-speech audio
+pyttsx3>=2.90
+pygame>=2.5.0
+elevenlabs>=1.0.0
+
+# Audio processing for Reachy integration
+librosa>=0.10.0
+soundfile>=0.12.0
